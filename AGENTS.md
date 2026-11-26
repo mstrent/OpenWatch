@@ -19,6 +19,11 @@ take turns at.
   rewriting upstream-authored docs.
 - Sensor facts and open survey questions belong in
   `docs/research/pixel-watch-sensor-map.md`.
+- Upstream acceptance is not a goal for this fork (decision 2026-11-26); every route must
+  work with **Workspace Google accounts only** (no consumer Gmail). Details and the
+  development plan: the status doc.
+- `wear/src/debug/` holds a fork-only survey probe (`HealthProbeActivity`) and the Health
+  Services client is a `debugImplementation` dependency; neither reaches release builds.
 
 ## What this is
 

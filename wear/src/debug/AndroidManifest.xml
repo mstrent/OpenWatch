@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fork-only, debug builds only: the Pixel Watch survey probe (docs/research/pixel-watch-sensor-map.md).
+     Exported so the survey can start it over adb:
+     adb shell am start -n tech.mmarca.openwatch.debug/tech.mmarca.openwatch.wear.debug.HealthProbeActivity -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name="tech.mmarca.openwatch.wear.debug.HealthProbeActivity"
+            android:exported="true"
+            android:taskAffinity="tech.mmarca.openwatch.probe"
+            android:excludeFromRecents="true" />
+    </application>
+</manifest>

@@ -1,6 +1,6 @@
 # Research: which Pixel Watch sensors an ordinary app can read
 
-**Status: step 1 (sensor list) and a first look at step 2 (Health Services, via dumpsys) verified on a Pixel Watch 5 on 2026-11-26; steps 3–4 still open.**
+**Status: steps 1–2 verified on a Pixel Watch 5 on 2026-11-26 (sensor list; Health Services via dumpsys and an on-watch probe), with the vendor app signed in on a consumer account; steps 3–4 (all-day batching and contention) still open.**
 This is the Pixel Watch companion to [wear-sensor-map.md](wear-sensor-map.md), which answers the
 same question for a Galaxy Watch7 from a `dumpsys sensorservice` capture. Nothing below is marked
 verified until a capture exists; everything else is marked **reported** and dated. The motivating
@@ -159,6 +159,33 @@ type ("MetricsMappings", 97 of them), not yet an app's `CapabilitiesClient` answ
 So Health Services fills the gaps OpenWatch has no raw route for (calories, distance, running
 dynamics, the vendor's step and floors pipeline, sleep detection), but not the vitals.
 
+## Verified: what an ordinary app actually receives (probe, 2026-11-26)
+
+`HealthProbeActivity` (debug builds only, `wear/src/debug/`) run on the same watch, worn, for
+120 s, with the debug watch app's own recorders running alongside. Fitbit / Google Health was
+signed in, **on the consumer Gmail account that is also on this watch**. Repeat the run on a
+Workspace-only watch before relying on the Health Services rows.
+
+- **Health Services capabilities for this app** equal the dumpsys table above: passive
+  `HeartRate`, `Steps`, `Distance`, `Calories`, `Floors`, `Elevation Gain` and their daily totals;
+  user activity states passive/exercise/asleep; measure: `HeartRate` only; exercise: the same ~90
+  exercise types.
+- **Health Services delivers**: live heart rate through `MeasureClient` every ~2 s with
+  `ACCURACY_HIGH` (`UNAVAILABLE_DEVICE_OFF_BODY` when not worn); passive heart rate at the same
+  rate; passive calories per minute, daily steps, distance, calories (including resting energy),
+  floors.
+- **The vendor's private passive types are closed.** Subscribing to
+  `health_services.device_private.<n>` fails with `SecurityException: Missing permissions:
+  [com.google.android.wearable.healthservices.permission.OEM_OPAQUE_DATA_ACCESS]`, and that
+  permission is `signature|privileged`. Not reachable by any app Google did not sign.
+- **Raw heart rate and Health Services heart rate run side by side without freezing** over two
+  minutes (same values, both ~0.5 Hz). The all-day contention test (question 4) still stands.
+- **`heart_rate_extended`** is not beat intervals: `values = [bpm, 0, status, 0…]`, where the status
+  follows the sensor's accuracy (3/2/1, and -1 off the wrist). No HRV route here.
+- **`skin_temperature`** delivers real wrist temperature in °C in `values[0]` (resolution 1/128 °C)
+  about every 30 s: 24.7 °C off the wrist, rising from 29.8 to 30.6 °C after putting it on.
+- **`step_cadence`** reports `-1` at rest; its walking values are not yet seen.
+
 ## What ordinary apps reach on Pixel Watch (reported, not verified here)
 
 Through the raw sensor door:
@@ -200,10 +227,10 @@ third-party apps does not.
 |---|---|---|
 | Heart rate, steps, ascent | Raw sensors, the same code as on Galaxy; contention with the stock stack is the open question. Health Services is the alternate route, and the vendor's own step pipeline rather than `step_counter` | built on raw, unverified on Pixel |
 | Sleep stages | From heart rate and motion (`SleepStageEstimator`); Health Services may offer the vendor's own sleep on a device that supports it | built, unverified on Pixel |
-| HRV (RMSSD), respiratory rate | Needs beat intervals. The code takes them from the raw pulse signal (`hr_raw`, probed as `rawPpg`) or from `TYPE_HEART_BEAT`; on Pixel neither has been shown to be reachable at the sensor. Health Services has HRV and respiratory rate types on supported devices, which would restore both without the raw signal | degrades off by the capability gate |
-| SpO2 | Red/IR closed at the sensor; Health Services has a spot oxygen type where a device supports it | degrades off |
+| HRV (RMSSD), respiratory rate | Needs beat intervals. **Verified closed on Pixel Watch 5 (2026-11-26):** no `TYPE_HEART_BEAT`, raw PPG signature-gated, `heart_rate_extended` carries no intervals, and Health Services lists no public HRV/respiratory type (the private ones need `OEM_OPAQUE_DATA_ACCESS`) | degrades off by the capability gate |
+| SpO2 | **Verified closed (2026-11-26):** no SpO2 sensor listed; no public Health Services type | degrades off |
 | Skin temperature | **Open at the sensor** (`com.google.sensor.skin_temperature`, `READ_SKIN_TEMPERATURE`, verified 2026-11-26); Health Services also has a type where a device supports it | the watch app reads skin temperature only from the Samsung tracker today; a Pixel route needs code |
-| Calories, distance, active steps | No route from the raw sensors OpenWatch reads; Health Services has cumulative types for all three | not built |
+| Calories, distance, floors | No route from the raw sensors OpenWatch reads; **Health Services delivers them to an ordinary app (verified 2026-11-26, consumer-account caveat)** | not built |
 | ECG, body composition, skin conductance | Gated | not built |
 
 On the raw path alone, no code change is expected for metric coverage: `WatchSensors` already
@@ -238,9 +265,9 @@ signed in or out.
 
 ## Open questions
 
-1. Does Health Services answer at all on a Pixel Watch whose vendor health app is not signed in,
-   and does its capability list shrink when the app is signed out? This is the question the rest of
-   the plan hangs on.
+1. Health Services answers and delivers on a watch where the vendor app is signed in on a
+   consumer account (verified 2026-11-26). **Still open:** does it on a Workspace-only watch, or
+   with the vendor app signed out?
 2. ~~The full sensor list with permission gates~~ — **answered 2026-11-26**: heart rate is gated by
    `READ_HEART_RATE` only (on Android 17); see the verified capture above. New follow-up: what do
    `heart_rate_extended` and `step_cadence` carry in their event values?
@@ -250,8 +277,9 @@ signed in or out.
    does reading through Health Services avoid the fight?
 5. ~~Is `TYPE_HEART_BEAT` present?~~ — **answered 2026-11-26: no.** HRV on the raw path stays off
    unless `heart_rate_extended` turns out to carry beat intervals.
-6. Which Health Services data types does a Pixel Watch 5 actually list, and do the ones OpenWatch
-   has no raw route for (calories, distance, active steps) appear?
+6. ~~Which Health Services data types does a Pixel Watch 5 list?~~ — **answered 2026-11-26**:
+   see the two verified Health Services sections above; calories, distance and floors appear,
+   the vitals do not.
 7. Do the stock face editor's complication slots list OpenWatch's three providers, and do all
    their slot types (short text, ranged value) render? And do the five tiles still appear in the
    tile list on Wear OS 7, alongside the new Wear Widgets?

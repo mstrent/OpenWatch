@@ -18,88 +18,194 @@ Strava and Zepp) and are **visible on the watch face**, even when Google Health 
 Fitbit is absent or not signed in. Nice-to-have: expose as much Pixel Watch sensor
 data as an ordinary app can actually reach.
 
-## Status (as of 2026-11-26)
+## Status (as of 2026-11-26, end of first survey session)
 
-- **Phase: on-device survey in progress. No code changed yet on this branch.**
-- Survey step 1 (sensor list) **done** on Matt's Pixel Watch 5 (2026-11-26); debug
-  watch app installed and logging. Steps 2–4 open (see Next actions).
-- Durable fork and clone set up; docs branch pushed (`f3b2fb5`).
-- Feasibility verdict: **plausible without code changes** — `WatchSensors`
-  capability gates already degrade metrics off on a watch that lacks a sensor
-  route; HRV/respiratory rate/SpO2/skin temp degrade off until an official route
-  is found or the survey proves a raw one.
-- The gating move now is the **on-device debug survey** of a real Pixel Watch 5
-  (steps/HR presence, `TYPE_HEART_BEAT`, hub batching, HR contention with the
-  stock stack, Health Services capability list with Fitbit signed out).
-- Metric-coverage code changes are **held until the survey results land**, and
-  need Matt's approval before implementation.
+- **Phase: on-device survey, mostly done. No product code changed yet**; the only code
+  on the branch is the debug-only survey probe and an install-script fix.
+- Survey steps 1–2 **done** on Matt's Pixel Watch 5 (sensor list; Health Services via
+  dumpsys and the on-watch probe). Steps 3–4 (all-day batching, HR contention) are
+  **collecting**: the debug watch app was left recording on Matt's wrist on 2026-11-26.
+- **Feasibility verdict: the minimum bar is reachable** with what an ordinary app gets
+  (raw heart rate + step counter, unchanged OpenWatch code paths), pending the all-day
+  data. Beyond the bar: skin temperature is newly reachable (raw sensor, needs code);
+  calories/distance/floors/running dynamics are reachable through Health Services
+  (needs code + the dependency). **SpO2, HRV and respiratory rate are not reachable on
+  Pixel** by any route that fits the Workspace-only rule (see route verdicts).
+- Caveat on every Health Services result so far: Google Health is signed in on the test
+  watch **with a consumer Gmail account**. Results must be repeated on a Workspace-only
+  watch (Decisions log) before they count.
+- Code changes need Matt's approval before implementation; the milestone plan is
+  under "Development plan".
+
+## Route verdicts (summary; evidence in the research doc)
+
+| Route | Verdict |
+|---|---|
+| Raw sensors: heart rate, step counter/detector, barometer, off-body, accelerometer | **Open**, AOSP permissions, verified delivering |
+| Raw `com.google.sensor.skin_temperature` | **Open** behind `health.READ_SKIN_TEMPERATURE`, real °C ~every 30 s; not used by OpenWatch yet (its skin path is Samsung-only) |
+| Raw `heart_rate_extended`, `step_cadence` | Open but uninteresting: bpm + status; cadence `-1` at rest. **No beat intervals** |
+| Raw PPG, ECG, GSR, 50/100 Hz IMU | **Closed**: `com.google.pixelwatch.permission.READ_PRIVATE_SENSORS` (signature) |
+| `TYPE_HEART_BEAT` | **Absent** |
+| Health Services public types (HR, steps, distance, calories, floors, elevation, sleep state, exercise metrics) | **Open and delivering** to our app — consumer-account caveat above |
+| Health Services `device_private.<n>` types (where Google's vitals likely live) | **Closed**: needs `OEM_OPAQUE_DATA_ACCESS`, `signature\|privileged` |
+| Google Health (ex-Fitbit) app → Health Connect; Google Health cloud API | **Excluded** by the Workspace-only rule (needs a Google Health account; Workspace reported unsupported). Cloud API also breaks no-`INTERNET` |
+| Health Connect itself | Fine: on-device, no account needed; OpenWatch's phone app already writes to it |
 
 ## Decisions log
 
 - **2026-11-26 — Workspace accounts only; no consumer Gmail account required.** Every
   route we build must work for a family member whose only Google account is
   Workspace. Matt's test watch *also* carries a consumer Gmail account (secondary,
-  visible to the Fitbit/Google Health app), so a result seen on it can depend on
-  that account: a finding only counts once it holds without the consumer account
-  (e.g. Fitbit/Google Health signed out or on the Workspace account). This rules out,
-  as the plan's backbone, routes that need the Google Health (ex-Fitbit) app or its
-  cloud API: Workspace sign-in to Google Health is reported unsupported
-  (community reports, not verified here).
-- **2026-11-26 — Upstream acceptance is not a goal.** The fork can keep what
-  upstream would reject (e.g. a Health Services dependency); upstream PRs are optional.
-
+  visible to the Google Health app), so a result seen on it can depend on that
+  account: a finding only counts once it holds without the consumer account (a
+  Workspace-only watch, or Google Health signed out). This rules out, as the plan's
+  backbone, routes that need the Google Health (ex-Fitbit) app or its cloud API.
+- **2026-11-26 — Upstream acceptance is not a goal.** The fork keeps what upstream
+  would reject (e.g. a Health Services dependency); upstream PRs are optional. The
+  `AGENTS.md` fork section still says what would need dropping for a PR.
+- **2026-11-26 — Google proprietary APIs/libraries are allowed** when they unlock
+  sensors or data, subject to the Workspace-only rule and the no-`INTERNET` watch
+  invariant (Health Services client 1.1.0 checked: no network permissions).
 - **2026-11-26 — Fork is the working copy.** All Pixel work happens on
-  `mstrent/OpenWatch` branch `pixel-watch-support`; PR back upstream only after
-  the effort is done (a ways off). Ephemeral sandbox checkouts are not trusted for
-  work: the 2026-11-25 working tree at `/tmp/OpenWatch` was lost with its
-  uncommitted docs.
-- **2026-11-26 — Google proprietary APIs/libraries are allowed** on the fork when
-  they unlock sensors or data (supersedes the earlier "stay off Health Services"
-  instinct for our purposes). Upstream's raw-sensors-only rule still stands for
-  anything we want merged; the fork exists so the dependency question can be
-  explored without holding the family's watches hostage.
-- **Workspace accounts are verified working** for the family's Pixel Watch setup
-  (with the domain's Device Management off). Not a blocker; do not relitigate
-  personal-vs-Workspace advice.
-- Sideloading / onboarding bypass is **historical**: not needed for the family's
-  already set-up, paired watches. `scripts/wear-install.sh` over wireless debug
-  is the whole install procedure for us.
-- No metric-coverage code change before the Pixel survey (gates already handle it).
+  `mstrent/OpenWatch` branch `pixel-watch-support`. Ephemeral sandbox checkouts are
+  not trusted: the 2026-11-25 tree at `/tmp/OpenWatch` was lost with its docs.
+- **Workspace accounts are verified working** for the watch's own setup (domain's
+  Device Management off). Do not relitigate personal-vs-Workspace advice.
+- Sideloading / onboarding bypass is **historical**: `scripts/wear-install.sh` over
+  wireless debugging is the whole install procedure for the family's paired watches.
 
 ## What is verified vs. assumed
 
-- **Verified by this project**: everything marked verified in
-  `docs/research/wear-sensor-map.md` and `docs/research/wear-ppg-hrv.md`
-  (TicWatch Pro 5, Galaxy Watch8 captures; tiles/complications on TicWatch).
-- **Verified by Matt (household)**: Workspace-account setup works on the family's
-  Pixel Watches.
-- **Community-reported, not verified here**: Pixel sensor list details,
-  pixelbridge/Gadgetbridge routes, pre-onboarding adb sideload on Pixel Watch.
-- **Verified on Matt's Pixel Watch 5 (2026-11-26)**: sensor list and gates (research doc,
-  "Verified" section). HR, steps, barometer, off-body are open; **skin temperature is open**
-  behind `READ_SKIN_TEMPERATURE`; no `TYPE_HEART_BEAT`; raw PPG/ECG/GSR are signature-gated.
-- **Untested hypotheses** (survey questions 1, 3, 4, 6–8 in the research doc): Pixel hub
-  batching vs `hub-40s`, HR arbitration with the stock Google stack, stock-face
-  complication slots accepting OpenWatch providers, Wear OS 7 tiles vs new Wear
-  Widgets, bedtime/DND effect on night accelerometer, `TYPE_HEART_BEAT` presence,
-  Health Services signed-out capability shrinkage.
+- **Verified on Matt's Pixel Watch 5 (2026-11-26)**: the sensor list and gates; Health
+  Services' capability table (dumpsys) and what it delivers to our app (probe, worn,
+  120 s); the private-type refusal; `heart_rate_extended`/skin temperature payloads;
+  the debug app's recorders registering with `hub-40s` batches that fit the FIFOs.
+- **Verified by Matt (household)**: Workspace-account watch setup works.
+- **Verified elsewhere in this repo**: what `docs/research/wear-sensor-map.md` and
+  `wear-ppg-hrv.md` mark verified (TicWatch Pro 5, Galaxy Watch8).
+- **Reported, not verified here**: Workspace accounts unsupported in Google Health
+  (community threads); Google Health app's Health Connect write set.
+- **Untested** (research doc open questions 1, 3, 4, 7, 8): Health Services on a
+  Workspace-only watch; hub batch delivery over a day; HR contention over a day;
+  stock-face complication slots and tiles vs Wear Widgets on Wear OS 7; night
+  accelerometer under Pixel bedtime mode.
+
+## Working on this: setup and commands
+
+Machine setup (done once per machine; verified on Matt's Fedora laptop):
+
+- `git submodule update --init --recursive` (`health-calculations`, `openlink`).
+- Android SDK: command-line tools in `~/Android/Sdk/cmdline-tools/latest`, then
+  `sdkmanager "platform-tools" "platforms;android-37.0" "build-tools;37.0.0"` (the
+  package is `android-37.0`, not `android-37`). `local.properties`:
+  `sdk.dir=/home/<user>/Android/Sdk` (gitignored). Export `ANDROID_HOME` for scripts.
+- JDK: any recent JDK launches Gradle; the foojay resolver downloads JDK 17 into
+  `~/.gradle/jdks` itself. No `sudo` needed.
+- Dependency changes: `./gradlew :wear:dependencies --configuration debugRuntimeClasspath
+  --write-locks --write-verification-metadata sha256`, then **revert lockfile churn in
+  unrelated modules** (that command rewrote a dozen of them) and keep only the
+  module you changed plus `gradle/verification-metadata.xml`.
+
+The watch:
+
+- Developer options on Wear OS 7: Settings → System → About → Versions → tap Build
+  number 7×. Then Developer options → Wireless debugging → Pair new device.
+- `scripts/wear-pair.sh <ip>:<pairing-port> <code>`, then `adb connect <ip>:<port>`
+  (connect port ≠ pairing port; `adb mdns services` lists both). Matt's watch was at
+  `10.0.0.48:35925` on 2026-11-26; the port changes on reboot.
+- Install + grant everything: `scripts/wear-install.sh --serial <ip>:<port>` (now also
+  grants `ACTIVITY_RECOGNITION`, skin temperature, SpO2). Reinstalling keeps the
+  debug app's recorded data.
+- Day-of-wear report: `python3 -I scripts/wear-debug-report.py --serial <ip>:<port> --save <dir>`.
+  **Turn Wireless debugging off while the watch is worn for data**: recording lives in the
+  debug app and needs no adb, and wireless debugging keeps Wi-Fi up, which costs battery
+  and skews the report's drain figures. Turn it back on only to pull (pairing persists;
+  the connect port changes, `adb mdns services` shows it).
+- Survey probe (debug builds only): `adb -s <w> shell am start -n
+  tech.mmarca.openwatch.debug/tech.mmarca.openwatch.wear.debug.HealthProbeActivity
+  --ei seconds 120`, worn, then `adb -s <w> exec-out run-as tech.mmarca.openwatch.debug
+  ls files/debug` and `cat files/debug/probe-<time>.jsonl`. Source:
+  `wear/src/debug/kotlin/tech/mmarca/openwatch/wear/debug/HealthProbeActivity.kt`.
+- Health Services' own view: `adb shell dumpsys activity service
+  com.google.android.wearable.healthservices`. Accounts (don't paste addresses into
+  the repo): `adb shell dumpsys account`.
 
 ## Next actions
 
-1. **Finish the Pixel Watch 5 survey** (sensor list done; debug app installed):
-   - wear the watch off the charger for a day/night, then
-     `python3 -I scripts/wear-debug-report.py --serial <ip>:<port> --save <dir>` —
-     answers batching (Q3) and HR contention (Q4); compare with the stock app's HR.
-   - Q1/Q6 (Health Services capabilities) need a small debug screen — code, ask Matt.
-   - Q7 (complication slots, tiles on Wear OS 7) and Q8 (night accelerometer) by hand.
-   - New candidates: probe `heart_rate_extended` (beat intervals?) and add a Pixel
-     skin-temperature route — both code, ask Matt.
-2. Decide the **Health Services dependency split** (fork keeps it if needed;
-   upstream PR would present the Jetpack-library-vs-closed-`.aar` argument).
-3. Only after 1–2: implement code (P2 batching fallback / P3 HR duty-cycle
-   hardening are conditional on survey results). **Ask Matt before code.**
-4. Verify with `./gradlew verifyCi` + `verifyWearCi` and
-   `python3 scripts/sync-wiki.py --repo mstrent/OpenWatch --check` before any push.
+1. **Pull Matt's day of wear** (debug app recording since 2026-11-26 ~09:40):
+   `wear-debug-report.py --save`; answer Q3 (do `hub-40s` batches arrive?) and Q4 (does
+   HR freeze beside the stock stack?). Ask Matt whether the stock HR ever froze.
+2. **Repeat the probe on a Workspace-only watch** (another family watch, or Google
+   Health signed out on Matt's). Decides whether the Health Services rows hold.
+3. Start the development plan below — Matt's OK per milestone. M1–M2 do not depend on
+   steps 1–2; M3 depends on step 1, M4 on step 2.
+4. Before any push of code: `./gradlew verifyCi verifyWearCi` and
+   `python3 scripts/sync-wiki.py --repo mstrent/OpenWatch --check`. (`verifyWearCi`
+   passed on 2026-11-26 with the probe in the debug source set.)
+
+## Development plan (if we start now, from what we know/assume)
+
+Ordered by value and by how little it depends on open questions. Assumptions are
+flagged; each milestone ends with an on-watch check, a status-doc update and a push.
+
+**M0 — End-to-end baseline, no code (½ day).** Assumes the existing raw paths just work
+on Pixel, which the survey so far supports. Pair Matt's Pixel phone with the debug phone
+app (`./gradlew :app:installDebug`, the watch app is the debug build already), add the
+watch as a Wear OS watch, sync, and confirm **heart rate and steps land in Health
+Connect** and show in Strava/Zepp. Add OpenWatch's tiles and complications to the
+watch face (also answers Q7). This proves the minimum bar or finds the real blocker
+before anything is built.
+
+**M1 — Pixel skin temperature (small, raw sensor, no new dependency).** Verified route.
+- New `SpotSource<SkinReading>` over `SensorManager` for `com.google.sensor.skin_temperature`
+  (non-wake-up is fine while sleep holds the CPU; `values[0]` °C; no ambient channel →
+  `ambientCelsius = NaN`/unset, `measured = accuracy >= MEDIUM`), e.g.
+  `wear/.../SensorSkinTemperatureSource.kt`.
+- Choose it in `WearGraph.kt` (`skinSource`, line ~122) when the sensor exists, Samsung
+  otherwise; update the KDoc in `SpotSource.kt` / `SkinTemperatureRecorder.kt` that says
+  the sensor is closed (true on Samsung, not on Pixel).
+- Permission `health.READ_SKIN_TEMPERATURE` is already declared and requested
+  (`WearPermissions.kt`). Phone side already imports skin temperature into Health
+  Connect (`devices/wearos/.../WearOsSkinTemperatureImport.kt`) — verify the capability
+  `CAP_SKIN_TEMPERATURE` gets advertised once the source exists (`WearLinkServerHost.kt`
+  removes it when unavailable).
+- Check: a night's skin temperature rows in Health Connect.
+- Open detail: delivery is ~every 30 s on-change; confirm it keeps delivering at night
+  under bedtime mode (Q8-adjacent).
+
+**M2 — Install/dev ergonomics (tiny).** Done for permissions. Optionally a `--probe`
+flag for `wear-install.sh` that runs `HealthProbeActivity` and pulls the file.
+
+**M3 — Hardening, only if the day-of-wear report says so.** If batches drop on the Pixel
+hub: a Pixel batching profile or fallback (the old "P2"). If raw HR freezes or goes stale
+beside the stock stack: duty-cycle hardening ("P3"), or switch HR to M4's source.
+Assumption to test first: with the raw and Health Services readers side by side for two
+minutes nothing froze; a day of data decides.
+
+**M4 — Health Services source (medium; depends on the Workspace-only probe).** Assumes the
+public Health Services types still deliver on a Workspace-only watch.
+- Move `health-services-client` from `debugImplementation` to `implementation` in
+  `wear/build.gradle.kts`; re-run the lock/verification update (see setup notes); confirm
+  the merged manifest still has no network permission.
+- New package `wear/.../healthservices/`, shaped like `wear/.../samsung/`: opt-in,
+  capability-probed (`CapabilitiesClient`), never a second silent writer beside a raw
+  recorder.
+- Value ladder: (a) **all-day calories, distance, floors** — new; needs new
+  `WearLinkProtocol` metrics/capabilities in `:wearlink` and phone-side Health Connect
+  mapping in `:devices:wearos` (floors already has `WearOsFloorsImport`); (b) **workouts**
+  through `ExerciseClient` — Google's calories, distance, pace, running dynamics, GPS — as
+  an alternative to the current raw workout path (`wear/.../workout/`); (c) optionally a
+  `HeartRateSource` over `MeasureClient`/passive HR beside `SensorHeartRateSource` /
+  `SamsungHeartRateSource` if M3 shows contention.
+- Decide and record: which source wins per metric when both raw and Health Services exist
+  (default: raw stays for HR/steps since it is verified and Workspace-safe; Health Services
+  only fills metrics raw cannot).
+
+**Not planned (no route under our constraints):** SpO2, HRV, respiratory rate on Pixel.
+They need Google-signed permissions (`READ_PRIVATE_SENSORS`, `OEM_OPAQUE_DATA_ACCESS`) or
+the Google Health account/cloud API. `WatchSensors`-style capability gates already keep
+them off. Revisit only if Google publishes a type or Workspace accounts become usable in
+Google Health. The existing Samsung paths for them stay untouched.
 
 ## Conventions for agents (any assistant)
 
@@ -139,6 +245,12 @@ data as an ordinary app can actually reach.
   elevation/sleep detection; **no public SpO2/HRV/resp/skin-temp types**. Fitbit
   subscribes to unnamed `device_private` types. Matt OK'd proprietary Google routes
   in principle (2026-11-26), with the Workspace-only constraint above.
+- Wrote `HealthProbeActivity` (debug source set only; Health Services client 1.1.0 as
+  `debugImplementation`, no network permissions in its manifest). Worn 120 s run:
+  HS heart rate/steps/calories/distance deliver; private HS types need
+  `OEM_OPAQUE_DATA_ACCESS` (signature|privileged) — closed; `heart_rate_extended` is
+  bpm + status, no beat intervals; skin temperature reads real °C. Details in the
+  research doc. Left the debug app recording for Matt's day of wear.
 
 ### 2026-11-26 — Lobe AI (session: durable setup)
 - Fork `mstrent/OpenWatch` created; clone moved to

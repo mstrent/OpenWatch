@@ -87,6 +87,9 @@ androidComponents {
 
 dependencies {
     implementation(project(":wearlink"))
+    // Fork-only: the Health Services probe (src/debug/.../HealthProbeActivity.kt) reads Google's
+    // on-watch health API. Debug builds only until the survey decides whether a source ships.
+    debugImplementation(libs.health.services.client)
     // The recorders' pure decisions and computations, tested on the plain JVM.
     implementation(project(":wear:recording-core"))
     // HRV, respiratory rate and the minute features from the raw sensors, shared with the phone.
