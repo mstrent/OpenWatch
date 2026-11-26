@@ -1,0 +1,200 @@
+# Research: which Pixel Watch sensors an ordinary app can read
+
+**Status: procedure and external evidence; no Pixel Watch has been surveyed by this project yet.**
+This is the Pixel Watch companion to [wear-sensor-map.md](wear-sensor-map.md), which answers the
+same question for a Galaxy Watch7 from a `dumpsys sensorservice` capture. Nothing below is marked
+verified until a capture exists; everything else is marked **reported** and dated. The motivating
+setup: a Pixel Watch whose family cannot rely on the vendor's health stack (Google Health sign-in
+for the whole watch was long the only supported path), leaving the watch app as the only reader of
+the watch.
+
+## The device the survey targets
+
+**Pixel Watch 5** (GSMArena, 2026-08): announced and shipped August 2026, ships **Wear OS 7**,
+which is based on Android 17 (API 37); 41 mm and 45 mm; Snapdragon W5 Gen 2 with a Cortex-M55
+coprocessor. Its listed health hardware is multi-path optical heart rate, ECG electrodes, SpO2,
+continuous skin conductance, skin temperature and a barometer/altimeter, plus dual-frequency
+GNSS (GPS, Galileo, GLONASS, BeiDou, QZSS).
+
+A spec sheet says what the part can measure, not what an ordinary app may read. Nothing in this
+section is a claim about access: that is exactly what step 1 measures. The watch's sensor hub is
+a different part from the Galaxy Watch7's, so treat the Galaxy map's FIFO sizes and gating as
+hypotheses to check, not as expectations to reuse.
+
+Wear OS 7 also changes the surfaces a watch app offers: it introduces **Wear Widgets** while
+leaving Tiles supported for now (Android Developers, 2026-05). OpenWatch's five watch surfaces are
+still tiles, which is why the tile question below is worth asking on the device before any
+migration is discussed.
+
+## Two ways to read a Pixel Watch
+
+There are two doors, and the second one is the interesting one.
+
+**The raw sensor door** is what OpenWatch uses everywhere today: `SensorManager`, the
+`android.sensor.*` types, batched and recorded on the watch. It is the same code as on Galaxy and
+TicWatch, and it is the only door this repository currently opens.
+
+**Health Services on Wear OS** is Google's own on-watch health API (`MeasureClient`,
+`SessionClient`, `CaloriesClient`, `GoalsClient`, `ExerciseEventsClient`, all discovered through
+`CapabilitiesClient`). It is a different thing from the vendor's *app*: it ships inside Google Play
+Services on the watch, and Google's own description of it is an "intermediary for sensors and
+algorithms that provides apps with high-quality data" (Android Developers). What matters here is
+that a third-party app is its intended audience, and that it hands over the *vendor's processed*
+numbers rather than raw light: heart rate, the step pipeline's counts, calories, distance, active
+steps, and, where a device supports them, spot SpO2, skin temperature, respiratory rate, HRV,
+sleep and stress. On a Pixel Watch that is the difference between the watch's raw PPG (closed) and
+the same heart rate the stock face displays (documented API).
+
+Two properties decide whether it belongs in OpenWatch:
+
+- The client is an ordinary Jetpack library, `androidx.health.services:health-services-client`,
+  Apache-2.0, with its source in AndroidX. It is not a vendor `.aar`. It *talks to* Google Play
+  Services at run time, so the implementation is proprietary even though the client is not, and a
+  watch without Play Services gets nothing.
+- `CapabilitiesClient` answers "what does *this* watch support" at run time. That is a better fit
+  for a capability-gated recorder than a spec sheet is: the survey does not have to guess, it can
+  ask.
+
+Whether either door is open on a Pixel Watch whose vendor health app is signed out is the single
+most important open question below, and it is answerable in ten minutes on a real watch.
+
+## How to fill this in
+
+All four steps need only wireless debugging on the watch, as in
+[wear-os-sideload.md](../how-to/wear-os-sideload.md).
+
+1. The sensor list and its gates, the way the Galaxy map was built:
+
+   ```bash
+   adb shell dumpsys sensorservice | sed -n '/Sensor List/,/^$/p'
+   ```
+
+   Record each sensor's name, type string and `perm:` entry. The questions that matter: whether
+   `android.sensor.heart_rate`, `android.sensor.step_counter` and `step_detector`,
+   `android.hardware.sensor.barometer` and a low-latency off-body sensor are present and gated the
+   AOSP way, and whether Google gates any of them behind its own signature permission.
+
+2. What Health Services offers this watch, which is the question `CapabilitiesClient` exists to
+   answer. A five-line debug screen (`getSupportedDataTypes`, then `getCapabilityList` per type)
+   prints the whole inventory: heart rate, steps and active steps, calories, distance, spot SpO2,
+   skin temperature, respiratory rate, HRV, sleep, stress. Run it twice, once with the vendor's
+   health app signed in and once out; if the two lists differ, that answer decides the whole
+   approach.
+
+3. The batching and delivery survey, with the debug watch app installed
+   (`scripts/wear-install.sh`):
+
+   ```bash
+   python3 -I scripts/wear-debug-report.py --serial <watch>
+   ```
+
+   The `device` line lists every sensor with its FIFO sizes and wake-up flag; the `registered`
+   lines show whether the `hub-40s` profile's batches survive in the FIFOs. The Galaxy watch hub
+   was tuned to that profile; the Pixel hub is a different part and is expected to need its own
+   number (or a fallback profile) if the batches drop.
+
+4. The heart rate contention test, the one Pixel-specific risk. The stock health stack runs the
+   optical sensor continuously. Third-party watch faces on Pixel Watch reported since 2022 that a
+   live reader froze the heart rate until it stopped reading, and some shipped a poll-every-30-
+   minutes workaround instead (Google support thread, 2022-12). Whether OpenWatch's batched, gated
+   recording survives beside the stock stack, and what the stock stack does to it in return, is a
+   day of logging with the debug report, not a guess. Reading heart rate through Health Services
+   instead of `SensorManager` may sidestep the contention entirely, since the vendor's own pipeline
+   owns the light; that is the second reason the survey is worth the day.
+
+## What ordinary apps reach on Pixel Watch (reported, not verified here)
+
+Through the raw sensor door:
+
+| Sensor | Evidence | Date |
+|---|---|---|
+| `android.sensor.heart_rate` (processed bpm) | commercial HR apps list Pixel Watch as supported (Pulsoid FAQ); apps rebroadcast the watch's heart rate over BLE, which needs the sensor API (Heart for Bluetooth on Play); the 2022 contention thread confirms third-party reads happen at all | 2022-12, 2026 |
+| `android.sensor.step_counter`, `step_detector` | Wear OS faces and apps read steps on Pixel Watch through the standard API | 2022-11 |
+| accelerometer, gyroscope, rotation vector | AOSP types, needed by every Wear OS motion app | — |
+| barometer, GPS | hardware is present (altimeter/barometer and dual-frequency GPS in the model's specs); sensor-API access untested | 2026-08 |
+| off-body detector | present on Wear OS watches generally; whether the low-latency variant exists on this hub is untested | — |
+
+Through Health Services: the API is documented for third-party apps on Wear OS 3 and up, and Google
+named the original Pixel Watch among its supported devices at launch (Android Developers blog,
+2022-11). The set of data types a *Pixel Watch 5 on Wear OS 7* exposes to an app that has not been
+granted anything by the vendor app is exactly what step 2 measures. The API has been alpha through
+its whole life, with types added and removed between versions (the samples repository says so
+outright), so a capability query at run time is the only safe design.
+
+## What is closed to ordinary apps
+
+The red/infrared SpO2 light, raw PPG and beat intervals, skin temperature, ECG electrodes and
+skin conductance have no open sensor path on Pixel Watch, the same as Samsung's `SSENSOR` gate on
+Galaxy. Google's own issue tracker has an open, unanswered request to expose beat intervals and
+raw PPG through Health Services. There is no third-party Binder route to Google's health stack
+either, unlike Samsung's platform: a Pixel metric that is gated at the sensor stays gated at the
+sensor.
+
+That sentence has a narrower reach than it used to. Raw light is not the only route to a number:
+Health Services is a documented route to the *processed* version of several of these metrics
+(spot SpO2, skin temperature, respiratory rate, HRV) on devices that support them. Defeating a
+vendor gate stays out of scope, as it does for Samsung. Asking an API Google published for
+third-party apps does not.
+
+## What follows for each wanted metric
+
+| Metric | Route on Pixel Watch | In OpenWatch |
+|---|---|---|
+| Heart rate, steps, ascent | Raw sensors, the same code as on Galaxy; contention with the stock stack is the open question. Health Services is the alternate route, and the vendor's own step pipeline rather than `step_counter` | built on raw, unverified on Pixel |
+| Sleep stages | From heart rate and motion (`SleepStageEstimator`); Health Services may offer the vendor's own sleep on a device that supports it | built, unverified on Pixel |
+| HRV (RMSSD), respiratory rate | Needs beat intervals. The code takes them from the raw pulse signal (`hr_raw`, probed as `rawPpg`) or from `TYPE_HEART_BEAT`; on Pixel neither has been shown to be reachable at the sensor. Health Services has HRV and respiratory rate types on supported devices, which would restore both without the raw signal | degrades off by the capability gate |
+| SpO2 | Red/IR closed at the sensor; Health Services has a spot oxygen type where a device supports it | degrades off |
+| Skin temperature | Sensor gated; Health Services has a skin temperature type where a device supports it | degrades off |
+| Calories, distance, active steps | No route from the raw sensors OpenWatch reads; Health Services has cumulative types for all three | not built |
+| ECG, body composition, skin conductance | Gated | not built |
+
+On the raw path alone, no code change is expected for metric coverage: `WatchSensors` already
+offers a metric only where its sensor or source exists, so a Pixel Watch records heart rate, steps,
+ascent, sleep and workouts and quietly drops the rest. What the survey can change is the batching
+profile (step 3 above) and, if the contention test fails, the heart rate duty cycle.
+
+If a Health Services source is added, that changes the picture rather than the fallback: it is a
+*new source*, not a new sensor read, and the honest shape of it is the shape the Samsung Binder
+client already uses — its own package, opt-in, capability-probed, and never a silent second writer
+beside the raw recorder. That also means it collides with an existing invariant, so it is a
+decision to make out loud rather than in a commit: `AGENTS.md` says the watch app reads raw
+Android sensors and that "Health Services and the Samsung Health Sensor SDK are not dependencies",
+and its stated reason is in [samsung-health-and-privacy.md](../engineering/samsung-health-and-privacy.md).
+The Samsung rule is about a proprietary `.aar` and a closed platform; Health Services is a Jetpack
+library and a published API, which is an argument that the rule may want splitting rather than
+dropping. Whether upstream accepts that argument is upstream's call, and the fork exists so the
+question can be asked without holding the family's watches hostage.
+
+## Onboarding, for the record
+
+A Pixel Watch can be installed over adb without the vendor's phone app if the watch's welcome
+screen opens Settings before onboarding: reported yes for Pixel Watch by the Gadgetbridge
+community and pixelbridge, not verified by this project. Sideloading is beside the point for a
+watch that is already set up and paired, which is the case that matters here: wireless debugging
+plus `scripts/wear-install.sh` is the whole procedure.
+
+A Google **Workspace** account works for the watch's own setup with the domain's Device Management
+turned off (Google's own setup page) — **verified working on this project's watches**, which removes
+the usual advice to fall back to a personal account. OpenWatch itself needs no account of any kind,
+signed in or out.
+
+## Open questions
+
+1. Does Health Services answer at all on a Pixel Watch whose vendor health app is not signed in,
+   and does its capability list shrink when the app is signed out? This is the question the rest of
+   the plan hangs on.
+2. The full sensor list with permission gates: is the heart rate sensor gated by anything beyond
+   the Health Connect `READ_HEART_RATE` grant on Android 16?
+3. Does the Pixel hub hold the `hub-40s` batches, or does the recorder registration need a
+   shorter report latency on this watch?
+4. Does continuous batched heart rate recording beside the stock stack freeze either reader — and
+   does reading through Health Services avoid the fight?
+5. Is `TYPE_HEART_BEAT` present (it would give the spot HRV back on the raw path)?
+6. Which Health Services data types does a Pixel Watch 5 actually list, and do the ones OpenWatch
+   has no raw route for (calories, distance, active steps) appear?
+7. Do the stock face editor's complication slots list OpenWatch's three providers, and do all
+   their slot types (short text, ranged value) render? And do the five tiles still appear in the
+   tile list on Wear OS 7, alongside the new Wear Widgets?
+8. Samsung's bedtime mode has no Pixel equivalent. Does the Pixel's own bedtime/sleep mode, or
+   Do Not Disturb, keep the accelerometer whole enough at night for the sleep estimate to find the
+   night, the way the Galaxy section of this map had to learn it did not?
