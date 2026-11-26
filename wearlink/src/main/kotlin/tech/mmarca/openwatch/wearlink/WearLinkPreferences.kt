@@ -19,7 +19,7 @@ object WearLinkPreferences {
     /** How a sleep hold keeps the minutes whole. [LOCK] / [SYNCED]. */
     const val SLEEP_HOLD: String = "sleep_hold"
 
-    /** Skin temperature at night from the Samsung platform. [OFF] / [ON]. */
+    /** Skin temperature at night, from the Samsung platform or Pixel's raw sensor. [OFF] / [ON]. */
     const val SKIN_TEMPERATURE: String = "skin"
 
     /** SpO2 spot measurements at night from the Samsung platform. [OFF] / [ON]. */

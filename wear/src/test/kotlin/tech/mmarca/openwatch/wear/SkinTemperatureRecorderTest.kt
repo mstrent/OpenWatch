@@ -35,4 +35,30 @@ class SkinTemperatureRecorderTest {
         )
         assertTrue(rows.isEmpty())
     }
+
+    @Test
+    fun `a skin-only minute, the Pixel channel, stamps the placeholder ambient and still round-trips`() {
+        val rows = SkinTemperatureRecorder.minutes(
+            listOf(
+                SkinReading(minute + 1_000, 34.0f, Float.NaN, measured = true),
+                SkinReading(minute + 31_000, 34.2f, Float.NaN, measured = true),
+            ),
+        )
+        assertEquals(listOf(WearLinkProtocol.SkinMinute(minute, 3410, SkinTemperatureRecorder.PLACEHOLDER_AMBIENT100)), rows)
+        // The wire line parses back to the same row: the placeholder keeps it in bounds.
+        val line = WearLinkProtocol.formatSkinMinute(rows.single())
+        assertEquals(rows.single(), WearLinkProtocol.parseSkinMinute(line))
+    }
+
+    @Test
+    fun `a mixed minute averages only the real ambients, the missing one says nothing`() {
+        val rows = SkinTemperatureRecorder.minutes(
+            listOf(
+                SkinReading(minute + 1_000, 34.0f, 22.0f, measured = true),
+                SkinReading(minute + 31_000, 34.2f, Float.NaN, measured = true),
+                SkinReading(minute + 41_000, 34.4f, 22.4f, measured = true),
+            ),
+        )
+        assertEquals(listOf(WearLinkProtocol.SkinMinute(minute, 3420, 2220)), rows)
+    }
 }

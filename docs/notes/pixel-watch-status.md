@@ -18,16 +18,19 @@ Strava and Zepp) and are **visible on the watch face**, even when Google Health 
 Fitbit is absent or not signed in. Nice-to-have: expose as much Pixel Watch sensor
 data as an ordinary app can actually reach.
 
-## Status (as of 2026-11-26, end of first survey session)
+## Status (as of 2026-11-26, after the M1/M2 implementation pass)
 
-- **Phase: on-device survey, mostly done. No product code changed yet**; the only code
-  on the branch is the debug-only survey probe and an install-script fix.
+- **Phase: M1 (Pixel skin temperature) and M2 (install ergonomics) are implemented and
+  locally gate-verified, committed and pushed on 2026-11-26** (journal below). What is
+  left for M1/M2 is the on-watch bench check. The on-device survey continues (steps
+  3–4 collecting).
 - Survey steps 1–2 **done** on Matt's Pixel Watch 5 (sensor list; Health Services via
   dumpsys and the on-watch probe). Steps 3–4 (all-day batching, HR contention) are
   **collecting**: the debug watch app was left recording on Matt's wrist on 2026-11-26.
 - **Feasibility verdict: the minimum bar is reachable** with what an ordinary app gets
   (raw heart rate + step counter, unchanged OpenWatch code paths), pending the all-day
-  data. Beyond the bar: skin temperature is newly reachable (raw sensor, needs code);
+  data. Beyond the bar: skin temperature is newly reachable (raw sensor; OpenWatch now
+  reads it, bench check pending);
   calories/distance/floors/running dynamics are reachable through Health Services
   (needs code + the dependency). **SpO2, HRV and respiratory rate are not reachable on
   Pixel** by any route that fits the Workspace-only rule (see route verdicts).
@@ -42,7 +45,7 @@ data as an ordinary app can actually reach.
 | Route | Verdict |
 |---|---|
 | Raw sensors: heart rate, step counter/detector, barometer, off-body, accelerometer | **Open**, AOSP permissions, verified delivering |
-| Raw `com.google.sensor.skin_temperature` | **Open** behind `health.READ_SKIN_TEMPERATURE`, real °C ~every 30 s; not used by OpenWatch yet (its skin path is Samsung-only) |
+| Raw `com.google.sensor.skin_temperature` | **Open** behind `health.READ_SKIN_TEMPERATURE`, real °C ~every 30 s; now OpenWatch's skin source on Pixel (M1, bench check pending); the Samsung path stays where present |
 | Raw `heart_rate_extended`, `step_cadence` | Open but uninteresting: bpm + status; cadence `-1` at rest. **No beat intervals** |
 | Raw PPG, ECG, GSR, 50/100 Hz IMU | **Closed**: `com.google.pixelwatch.permission.READ_PRIVATE_SENSORS` (signature) |
 | `TYPE_HEART_BEAT` | **Absent** |
@@ -126,6 +129,9 @@ The watch:
   --ei seconds 120`, worn, then `adb -s <w> exec-out run-as tech.mmarca.openwatch.debug
   ls files/debug` and `cat files/debug/probe-<time>.jsonl`. Source:
   `wear/src/debug/kotlin/tech/mmarca/openwatch/wear/debug/HealthProbeActivity.kt`.
+  `scripts/wear-install.sh --probe` (debug variant) now starts it and pulls the
+  `probe-*.jsonl` files to `reports/` in one shot: default 130 s, override with
+  `--probe-seconds <n>`.
 - Health Services' own view: `adb shell dumpsys activity service
   com.google.android.wearable.healthservices`. Accounts (don't paste addresses into
   the repo): `adb shell dumpsys account`.
@@ -137,8 +143,9 @@ The watch:
    HR freeze beside the stock stack?). Ask Matt whether the stock HR ever froze.
 2. **Repeat the probe on a Workspace-only watch** (another family watch, or Google
    Health signed out on Matt's). Decides whether the Health Services rows hold.
-3. Start the development plan below — Matt's OK per milestone. M1–M2 do not depend on
-   steps 1–2; M3 depends on step 1, M4 on step 2.
+3. The development plan below: **M1 and M2 are implemented, gated and pushed** (see
+   journal) — what is left is the M1 on-watch bench check.
+   Matt's OK per milestone still gates what follows: M3 depends on step 1, M4 on step 2.
 4. Before any push of code: `./gradlew verifyCi verifyWearCi` and
    `python3 scripts/sync-wiki.py --repo mstrent/OpenWatch --check`. (`verifyWearCi`
    passed on 2026-11-26 with the probe in the debug source set.)
@@ -157,6 +164,8 @@ watch face (also answers Q7). This proves the minimum bar or finds the real bloc
 before anything is built.
 
 **M1 — Pixel skin temperature (small, raw sensor, no new dependency).** Verified route.
+**Implemented and locally gate-verified 2026-11-26** (see journal); the on-watch
+night-rows bench check remains.
 - New `SpotSource<SkinReading>` over `SensorManager` for `com.google.sensor.skin_temperature`
   (non-wake-up is fine while sleep holds the CPU; `values[0]` °C; no ambient channel →
   `ambientCelsius = NaN`/unset, `measured = accuracy >= MEDIUM`), e.g.
@@ -173,8 +182,9 @@ before anything is built.
 - Open detail: delivery is ~every 30 s on-change; confirm it keeps delivering at night
   under bedtime mode (Q8-adjacent).
 
-**M2 — Install/dev ergonomics (tiny).** Done for permissions. Optionally a `--probe`
-flag for `wear-install.sh` that runs `HealthProbeActivity` and pulls the file.
+**M2 — Install/dev ergonomics (tiny).** **Done 2026-11-26**: permissions are granted by
+the script, and `--probe [--probe-seconds <n>]` runs `HealthProbeActivity` after install
+and pulls the `probe-*.jsonl` files to `reports/` (debug variant only).
 
 **M3 — Hardening, only if the day-of-wear report says so.** If batches drop on the Pixel
 hub: a Pixel batching profile or fallback (the old "P2"). If raw HR freezes or goes stale
@@ -225,6 +235,54 @@ Google Health. The existing Samsung paths for them stay untouched.
   permission ≠ network permission, but check what a dependency drags in).
 
 ## Session journal (newest first)
+
+### 2026-11-26 — Lobe AI / pair-programmer (session: M1 skin temperature + M2 probe, committed)
+- **M1 implemented** (now committed; gate verified below):
+  - New `SensorSkinTemperatureSource` over `SensorManager` for the raw
+    `com.google.sensor.skin_temperature` sensor; `measured` only at accuracy
+    ≥ MEDIUM; no ambient channel, so `ambientCelsius = NaN` (skin-only reading).
+  - `WearGraph` picks it ahead of the Samsung tracker when the sensor is present,
+    Samsung otherwise; `abilities()` reports `skinSensor` without implying Samsung.
+  - `SkinTemperatureRecorder` accepts skin-only minutes: the wire has no
+    "no ambient" encoding, so absent ambient becomes the in-bounds
+    `PLACEHOLDER_AMBIENT100 = 2300`; the phone side maps skin Celsius only, so
+    the placeholder never reaches Health Connect. Emitted rows are round-tripped
+    through the protocol parser before they are kept.
+  - `WatchAbilities.skinSensor` added; the codec now lets the skin setting turn
+    on when `samsung || skinSensor`. SpO2 stays Samsung-gated.
+  - Settings screen splits the skin row from the Samsung-only SpO2/HR-source
+    rows (`samsung` + `skin` availability booleans through the settings port).
+  - `HELLO` caps advertise `sk` and `o2` independently (capabilitiesFor seam,
+    unit-tested); KDoc/strings across `WearLinkProtocol`, `WearLinkPreferences`,
+    `WearSettings`, `WearMetric` and `values/strings.xml` now say Pixel where
+    that is true. **Translated `values-*/` strings deferred** — they still say
+    Samsung.
+- **M2 done**: `scripts/wear-install.sh --probe [--probe-seconds <n>]` starts
+  `HealthProbeActivity` after install and pulls `files/debug/probe-*.jsonl` to
+  `reports/` (default 130 s; debug variant only — release + `--probe` dies).
+  `bash -n` clean; no device run yet.
+- **Gate, 2026-11-26 (this laptop, pre-commit)**: `./gradlew verifyWearCi` BUILD
+  SUCCESSFUL — includes the FileSize/FunctionLength/LogCallers ratchets. Targeted
+  `:wear:testDebugUnitTest` (skin, link-host, source, settings, codec) and
+  `:wear:recording-core:test` green. Wiki link check
+  (`scripts/sync-wiki.py --repo mstrent/OpenWatch --check`) green. Merged debug
+  manifest carries no `INTERNET`/`ACCESS_NETWORK_STATE`/`ACCESS_WIFI_STATE`:
+  `grep -cE 'INTERNET|ACCESS_NETWORK_STATE|ACCESS_WIFI_STATE'
+  wear/build/intermediates/merged_manifest/debug/processDebugMainManifest/AndroidManifest.xml`
+  → 0. Runtimes: launcher JDK 25.0.5, Gradle 9.7.0, `ANDROID_HOME=/home/t3rmin/Android/Sdk`
+  exported (the `openlink` included build needs it even though `local.properties`
+  has `sdk.dir`).
+- **Two gate fixes found during the pass**: the sensor is looked up via
+  `getSensorList(TYPE_ALL)` matched on string type — the SDK has no
+  `getDefaultSensor(String)` overload; and the source's test uses
+  `SensorManager.SENSOR_STATUS_UNRELIABLE` — there is no
+  `SENSOR_STATUS_ACCURACY_UNRELIABLE` constant.
+- **Still un-benched**: a real Pixel Watch 5 run (skin cadence at night, night rows
+  in Health Connect, `--probe` end-to-end) is pending.
+- **Deferred / pending Matt's call**: translated `values-*/` `settings_skin_*`
+  strings still say Samsung; whether `reports/` (pulled probe output) gets
+  gitignored; whether `WearPreferenceCodec.encode()` should emit a `skin_sensor`
+  token for the phone UI.
 
 ### 2026-11-26 — Claude Code (session: first on-device survey)
 - Set up this laptop to build: submodules initialised, Android SDK in `~/Android/Sdk`

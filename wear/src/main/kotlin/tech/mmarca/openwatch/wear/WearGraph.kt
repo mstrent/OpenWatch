@@ -119,7 +119,7 @@ internal class WearGraph(private val app: Application) {
     private val spo2Claim = SensorClaim()
     private val samsungWindows: HrvWindowSource by lazy { SamsungIbiSource(samsungFeed, debug) }
     private val spo2Source: SpotSource<Spo2Reading> by lazy { SamsungSpotSource.spo2(samsungFeed) }
-    private val skinSource: SpotSource<SkinReading> by lazy { SamsungSpotSource.skinTemperature(samsungFeed) }
+    private val skinSource: SpotSource<SkinReading> by lazy { SensorSkinTemperatureSource(app, debug).takeIf { it.isAvailable } ?: SamsungSpotSource.skinTemperature(samsungFeed) }
 
     val heartRate: HeartRateRecorder by lazy {
         HeartRateRecorder(
@@ -296,7 +296,8 @@ internal class WearGraph(private val app: Application) {
             store = store,
             live = liveHeartRate,
             hrvAvailable = { nightHrv.hasSensor },
-            skinAvailable = { skinTemperature.isAvailable },
+            skinAvailable = { skinSource.isAvailable },
+            spo2Available = { spotSpo2Source.isAvailable },
             onPhoneActive = { at -> sleepMinutes.notePhoneActive(at) },
             heldPreferences = { WearPreferenceCodec.encode(WearSettings.read(app), abilities()) },
             setPreference = ::applyPhonePreference,
@@ -322,6 +323,7 @@ internal class WearGraph(private val app: Application) {
         samsung = samsungFeed.isAvailable,
         skinGranted = WearPermissions.hasSkinTemperature(app),
         spo2Granted = WearPermissions.hasOxygenSaturation(app),
+        skinSensor = skinSource.isAvailable,
     )
 
     /** A setting the phone changed: stored, and the running service follows. Link thread. */

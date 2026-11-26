@@ -20,6 +20,7 @@ class WearPreferenceCodecTest {
     )
     private val samsung = WatchAbilities(samsung = true, skinGranted = true, spo2Granted = false)
     private val pixel = WatchAbilities(samsung = false, skinGranted = false, spo2Granted = false)
+    private val pixelRaw = WatchAbilities(samsung = false, skinGranted = true, spo2Granted = false, skinSensor = true)
 
     @Test
     fun `every setting and ability goes out as a token`() {
@@ -52,6 +53,12 @@ class WearPreferenceCodecTest {
         assertNull(WearPreferenceCodec.apply(defaults, pixel, "hr_source", "samsung"))
         assertNull(WearPreferenceCodec.apply(defaults, pixel, "skin", "1"))
         assertEquals(defaults, WearPreferenceCodec.apply(defaults, pixel, "skin", "0"))
+    }
+
+    @Test
+    fun `the raw Pixel skin sensor opens skin but never SpO2`() {
+        assertEquals(true, WearPreferenceCodec.apply(defaults, pixelRaw, "skin", "1")!!.skinTemperature)
+        assertNull(WearPreferenceCodec.apply(defaults, pixelRaw, "spo2", "1"))
     }
 
     @Test

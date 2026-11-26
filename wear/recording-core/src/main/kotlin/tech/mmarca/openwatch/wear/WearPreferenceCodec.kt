@@ -55,7 +55,13 @@ data class WatchPreferences(
 }
 
 /** What the watch can offer, which the phone reads but cannot change. */
-data class WatchAbilities(val samsung: Boolean, val skinGranted: Boolean, val spo2Granted: Boolean)
+data class WatchAbilities(
+    val samsung: Boolean,
+    val skinGranted: Boolean,
+    val spo2Granted: Boolean,
+    /** Raw skin-temperature sensor present (Pixel), independent of samsung. */
+    val skinSensor: Boolean = false,
+)
 
 /**
  * The watch's settings as the `GET_PREF` and `SET_PREF` tokens
@@ -97,7 +103,7 @@ object WearPreferenceCodec {
             Preferences.SYNCED -> preferences.copy(syncedSleepHold = true)
             else -> null
         }
-        Preferences.SKIN_TEMPERATURE -> flag(value)?.takeIf { !it || abilities.samsung }?.let { preferences.copy(skinTemperature = it) }
+        Preferences.SKIN_TEMPERATURE -> flag(value)?.takeIf { !it || abilities.samsung || abilities.skinSensor }?.let { preferences.copy(skinTemperature = it) }
         Preferences.SPO2 -> flag(value)?.takeIf { !it || abilities.samsung }?.let { preferences.copy(spo2AtNight = it) }
         Preferences.HEART_RATE_MAX -> bpm(value, MAX_HEART_RATE_RANGE)?.let { preferences.copy(maxHeartRate = it.takeIf { bpm -> bpm > 0 }) }
         Preferences.HEART_RATE_REST -> bpm(value, RESTING_HEART_RATE_RANGE)?.let { preferences.copy(restingHeartRate = it.takeIf { bpm -> bpm > 0 }) }

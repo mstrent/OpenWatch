@@ -10,6 +10,9 @@
 #   --no-build       never run Gradle; fail when the APK is missing
 #   --no-grant       do not pre-grant runtime permissions; the app asks on the wrist
 #   --status         only report; install nothing
+#   --probe          after install: run the debug HealthProbeActivity for
+#                    --probe-seconds s (default 130), then pull its probe-*.jsonl to reports/
+#   --probe-seconds <n>  how long the probe runs, in whole seconds
 #
 # Pair the computer first: scripts/wear-pair.sh. Guide: docs/how-to/wear-os-sideload.md
 set -euo pipefail
@@ -30,6 +33,9 @@ PACKAGE=""
 BUILD=yes
 GRANT=yes
 STATUS_ONLY=no
+PROBE=no
+PROBE_SECONDS=130
+PROBE_ACTIVITY="tech.mmarca.openwatch.wear.debug.HealthProbeActivity"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -40,10 +46,16 @@ while [ $# -gt 0 ]; do
         --no-build) BUILD=no; shift ;;
         --no-grant) GRANT=no; shift ;;
         --status) STATUS_ONLY=yes; shift ;;
-        -h|--help) sed -n '2,14p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --probe) PROBE=yes; shift ;;
+        --probe-seconds) PROBE_SECONDS="$2"; shift 2 ;;
+        -h|--help) sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) die "unknown argument $1" ;;
     esac
 done
+
+if [ "$PROBE" = yes ] && [ "$VARIANT" = release ]; then
+    die "the probe is debug-only"
+fi
 
 resolve_apk() {
     if [ -z "$APK" ]; then
@@ -114,6 +126,31 @@ status() {
     fi
 }
 
+probe() {
+    # Debug builds only: HealthProbeActivity writes probe-<time>.jsonl under
+    # files/debug in the app's private storage; run-as reaches it without root.
+    case "$PROBE_SECONDS" in
+        ''|*[!0-9]*) die "--probe-seconds wants a whole number of seconds, got '$PROBE_SECONDS'" ;;
+    esac
+    say "Probing for $PROBE_SECONDS s"
+    shell am start -n "$PACKAGE/$PROBE_ACTIVITY" >/dev/null \
+        || die "could not start $PROBE_ACTIVITY; is $PACKAGE a debug build with the probe?"
+    sleep "$PROBE_SECONDS"
+    local names saved=0 name
+    names="$(adbw exec-out run-as "$PACKAGE" ls files/debug 2>/dev/null | tr -d '\r' | grep '^probe-.*\.jsonl$' || true)"
+    if [ -z "$names" ]; then
+        warn "the probe wrote no probe-*.jsonl under files/debug; it may have failed to start or is still running"
+        return
+    fi
+    mkdir -p "$REPO_ROOT/reports"
+    for name in $names; do
+        adbw exec-out run-as "$PACKAGE" cat "files/debug/$name" > "$REPO_ROOT/reports/$name"
+        note "saved reports/$name"
+        saved=$((saved + 1))
+    done
+    note "$saved probe file(s) saved to reports/"
+}
+
 require_watch
 
 if [ "$STATUS_ONLY" = yes ]; then
@@ -135,6 +172,9 @@ say "Launching"
 shell am start -W -n "$PACKAGE/$MAIN_ACTIVITY" >/dev/null && note "the watch app is on screen"
 sleep 3
 status
+if [ "$PROBE" = yes ]; then
+    probe
+fi
 cat <<TEXT
 
 Next, on the phone:
