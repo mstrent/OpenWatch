@@ -1,6 +1,6 @@
 # Research: which Pixel Watch sensors an ordinary app can read
 
-**Status: step 1 (sensor list) verified on a Pixel Watch 5 on 2026-11-26; steps 2–4 still open.**
+**Status: step 1 (sensor list) and a first look at step 2 (Health Services, via dumpsys) verified on a Pixel Watch 5 on 2026-11-26; steps 3–4 still open.**
 This is the Pixel Watch companion to [wear-sensor-map.md](wear-sensor-map.md), which answers the
 same question for a Galaxy Watch7 from a `dumpsys sensorservice` capture. Nothing below is marked
 verified until a capture exists; everything else is marked **reported** and dated. The motivating
@@ -135,6 +135,29 @@ First debug-build run (`wear-debug-report.py`, about a minute): every recorder r
 `hub-40s` with its batch inside the FIFO — heart rate 40/3000 (wake-up), steps 200/3000, ascent
 40/3000, sleep accelerometer 200/3000, off-body unbatched. Delivery over a worn day (whether the
 hub honours those batches) is not measured yet.
+
+## Verified: what Health Services lists on a Pixel Watch 5 (2026-11-26)
+
+Read with `adb shell dumpsys activity service com.google.android.wearable.healthservices` on the
+same watch (Fitbit signed in). This is the service's own table of supported types per exercise
+type ("MetricsMappings", 97 of them), not yet an app's `CapabilitiesClient` answer.
+
+- **Passive (all-day) types:** `HEART_RATE_BPM`, `PASSIVE_STEP_COUNT`, `PASSIVE_DISTANCE`,
+  `PASSIVE_ALL_CALORIES`, `PASSIVE_FLOORS`, `PASSIVE_ELEVATION_GAIN`, plus `SLEEP_DETECTION` and
+  `ABNORMAL_HR_DETECTION`.
+- **Exercise types (96 kinds):** heart rate and its stats, calories, active duration, distance,
+  steps, speed/pace, cadence, elevation, floors, location/GNSS, auto-pause/stop, swim laps, and for
+  running the running dynamics (stride length, ground contact time, vertical oscillation/ratio).
+- **No public type for SpO2, HRV, respiratory rate, skin temperature, stress or VO2 max.** The
+  earlier claim in this doc that Health Services offers them "where a device supports it" does not
+  hold for this watch.
+- **Numeric types** (`65537`–`65549` passive, `131073`–`131078` per exercise) appear with no public
+  name; the Fitbit app subscribes to the passive ones as `health_services.device_private.<n>`. These
+  are presumably where Google's own SpO2/HRV/skin-temperature pipelines live. Whether a
+  third-party app can subscribe to a `device_private` type, or is refused, is untested.
+
+So Health Services fills the gaps OpenWatch has no raw route for (calories, distance, running
+dynamics, the vendor's step and floors pipeline, sleep detection), but not the vitals.
 
 ## What ordinary apps reach on Pixel Watch (reported, not verified here)
 

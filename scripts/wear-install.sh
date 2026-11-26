@@ -64,9 +64,12 @@ resolve_apk() {
 }
 
 grant_permissions() {
-    local permissions=(android.permission.BLUETOOTH_CONNECT android.permission.POST_NOTIFICATIONS)
+    # ACTIVITY_RECOGNITION gates step_counter and step_detector; without it the
+    # steps recorder registers nothing. Location stays a wrist prompt (workouts ask).
+    local permissions=(android.permission.BLUETOOTH_CONNECT android.permission.POST_NOTIFICATIONS android.permission.ACTIVITY_RECOGNITION)
     if [ "$SDK" -ge 36 ]; then
-        permissions+=(android.permission.health.READ_HEART_RATE android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND)
+        permissions+=(android.permission.health.READ_HEART_RATE android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND
+            android.permission.health.READ_SKIN_TEMPERATURE android.permission.health.READ_OXYGEN_SATURATION)
     elif [ "$SDK" -ge 33 ]; then
         permissions+=(android.permission.BODY_SENSORS android.permission.BODY_SENSORS_BACKGROUND)
     else
@@ -97,7 +100,7 @@ status() {
     fi
     note "app: $(echo "$dump" | sed -n 's/^ *versionName=//p' | head -1) (code $(echo "$dump" | sed -n 's/^ *versionCode=\([0-9]*\).*/\1/p' | head -1))"
     local permission
-    for permission in BLUETOOTH_CONNECT POST_NOTIFICATIONS READ_HEART_RATE READ_HEALTH_DATA_IN_BACKGROUND BODY_SENSORS BODY_SENSORS_BACKGROUND; do
+    for permission in BLUETOOTH_CONNECT POST_NOTIFICATIONS ACTIVITY_RECOGNITION READ_HEART_RATE READ_HEALTH_DATA_IN_BACKGROUND READ_SKIN_TEMPERATURE READ_OXYGEN_SATURATION BODY_SENSORS BODY_SENSORS_BACKGROUND; do
         if echo "$dump" | grep -Eq "\.$permission: granted=true"; then
             note "granted: $permission"
         elif echo "$dump" | grep -Eq "\.$permission: granted=false"; then

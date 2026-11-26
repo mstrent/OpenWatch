@@ -78,9 +78,6 @@ data as an ordinary app can actually reach.
    - wear the watch off the charger for a day/night, then
      `python3 -I scripts/wear-debug-report.py --serial <ip>:<port> --save <dir>` —
      answers batching (Q3) and HR contention (Q4); compare with the stock app's HR.
-   - after the install script, also `pm grant` `ACTIVITY_RECOGNITION`,
-     `health.READ_SKIN_TEMPERATURE`, `health.READ_OXYGEN_SATURATION` —
-     `scripts/wear-install.sh` does not grant them (small script fix, ask Matt).
    - Q1/Q6 (Health Services capabilities) need a small debug screen — code, ask Matt.
    - Q7 (complication slots, tiles on Wear OS 7) and Q8 (night accelerometer) by hand.
    - New candidates: probe `heart_rate_extended` (beat intervals?) and add a Pixel
@@ -124,6 +121,12 @@ data as an ordinary app can actually reach.
   report shows every recorder registered with `hub-40s` batches fitting the FIFOs.
 - Learned: skin temperature has an open raw route on Pixel; no `TYPE_HEART_BEAT`;
   `heart_rate_extended` sits behind the public HR grant and is worth probing.
+- `scripts/wear-install.sh` now also grants `ACTIVITY_RECOGNITION`, skin temperature
+  and SpO2 (verified: revoke, reinstall, all granted).
+- Health Services dumpsys: public passive types are HR/steps/distance/calories/floors/
+  elevation/sleep detection; **no public SpO2/HRV/resp/skin-temp types**. Fitbit
+  subscribes to unnamed `device_private` types. Matt OK'd proprietary Google routes
+  in principle (2026-11-26); options laid out for him, decision pending.
 
 ### 2026-11-26 — Lobe AI (session: durable setup)
 - Fork `mstrent/OpenWatch` created; clone moved to
