@@ -44,6 +44,13 @@ object WearLinkPreferences {
     /** Read only: whether the watch has the Samsung Health Platform. [OFF] / [ON]. */
     const val SAMSUNG_AVAILABLE: String = "samsung"
 
+    /**
+     * Read only: whether the watch carries the raw skin-temperature sensor (the Pixel's),
+     * independent of [SAMSUNG_AVAILABLE]. An older watch sends no token at all; the phone
+     * then reads the absence as [OFF].
+     */
+    const val SKIN_SENSOR: String = "skin_sensor"
+
     /** Read only: whether the watch holds the permission its skin temperature needs. [OFF] / [ON]. */
     const val SKIN_GRANTED: String = "skin_granted"
 

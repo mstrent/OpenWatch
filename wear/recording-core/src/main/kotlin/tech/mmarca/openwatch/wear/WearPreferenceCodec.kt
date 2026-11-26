@@ -83,6 +83,7 @@ object WearPreferenceCodec {
         Preferences.BIRTH_YEAR to (preferences.birthYear ?: 0).toString(),
         Preferences.SEX to sex(preferences.sex),
         Preferences.SAMSUNG_AVAILABLE to flag(abilities.samsung),
+        Preferences.SKIN_SENSOR to flag(abilities.skinSensor),
         Preferences.SKIN_GRANTED to flag(abilities.skinGranted),
         Preferences.SPO2_GRANTED to flag(abilities.spo2Granted),
     )

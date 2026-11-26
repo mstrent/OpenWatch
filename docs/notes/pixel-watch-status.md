@@ -144,7 +144,8 @@ The watch:
 2. **Repeat the probe on a Workspace-only watch** (another family watch, or Google
    Health signed out on Matt's). Decides whether the Health Services rows hold.
 3. The development plan below: **M1 and M2 are implemented, gated and pushed** (see
-   journal) — what is left is the M1 on-watch bench check.
+   journal), including the phone-side parity follow-up (skin_sensor token + phone skin
+   toggle for raw-sensor watches, 2026-11-26) — what is left is the M1 on-watch bench check.
    Matt's OK per milestone still gates what follows: M3 depends on step 1, M4 on step 2.
 4. Before any push of code: `./gradlew verifyCi verifyWearCi` and
    `python3 scripts/sync-wiki.py --repo mstrent/OpenWatch --check`. (`verifyWearCi`
@@ -235,6 +236,14 @@ Google Health. The existing Samsung paths for them stay untouched.
   permission ≠ network permission, but check what a dependency drags in).
 
 ## Session journal (newest first)
+
+### 2026-11-26 — Lobe AI / pair-programmer (session: phone-side parity follow-up)
+- **Skin strings vendor-neutral across 15 locales** (`values-{ar,cs,de,es,et,fi,fr,gl,it,iw,ja,pl,pt,ru,zh-rCN}/strings.xml`): `settings_skin_temperature_on` / `settings_skin_explained` no longer say Samsung. SpO2/HRV/HR-source strings **stay Samsung-worded by design** — those routes really are Samsung-only.
+- **`reports/` gitignored** — probe output pulled by `wear-install.sh --probe` is personal bench data; no upstream precedent for committed report artifacts. Closes the open question from the M1/M2 journal.
+- **`skin_sensor` read-only ability token on the wire**: `WearLinkPreferences.SKIN_SENSOR` ("skin_sensor"), emitted by `WearPreferenceCodec.encode()` as 1/0, documented so an older watch that sends no token reads as OFF. Codec tests assert both values, the absent-token behavior, and that the raw sensor opens skin but never SpO2.
+- **Phone skin toggle now gated `samsung || skin_sensor`**: pure seams `skinOfferedByWatch` / `spo2OfferedByWatch` in `WearOsWatchPanelViewModel.kt`; `WearOsWatchPanel.kt` renders the skin SwitchRow under either ability, SpO2 stays inside the Samsung-only block. New VM unit test covers samsung→skin+spo2, skin_sensor-only→skin-not-spo2, neither→neither (5 tests, 0 failures).
+- **Gates green (this laptop, pre-commit)**: `verifyWearCi` BUILD SUCCESSFUL (1m9s, ratchets included), `:feature:watches-wearos:testCiUnitTest`, `verifyTranslations` (255 locale files, coverage >70%), wiki link check, merged debug manifest still carries no `INTERNET`/`ACCESS_NETWORK_STATE`/`ACCESS_WIFI_STATE` (grep → 0). Runtimes: launcher JDK 25.0.5, Gradle 9.7.0.
+- **Still un-benched**: everything from the M1/M2 pass — real-watch skin cadence, night rows in Health Connect, `--probe` end-to-end.
 
 ### 2026-11-26 — Lobe AI / pair-programmer (session: M1 skin temperature + M2 probe, committed)
 - **M1 implemented** (now committed; gate verified below):
