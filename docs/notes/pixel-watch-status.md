@@ -20,7 +20,9 @@ data as an ordinary app can actually reach.
 
 ## Status (as of 2026-11-26)
 
-- **Phase: documentation + survey planning. No code changed yet on this branch.**
+- **Phase: on-device survey in progress. No code changed yet on this branch.**
+- Survey step 1 (sensor list) **done** on Matt's Pixel Watch 5 (2026-11-26); debug
+  watch app installed and logging. Steps 2–4 open (see Next actions).
 - Durable fork and clone set up; docs branch pushed (`f3b2fb5`).
 - Feasibility verdict: **plausible without code changes** — `WatchSensors`
   capability gates already degrade metrics off on a watch that lacks a sensor
@@ -61,7 +63,10 @@ data as an ordinary app can actually reach.
   Pixel Watches.
 - **Community-reported, not verified here**: Pixel sensor list details,
   pixelbridge/Gadgetbridge routes, pre-onboarding adb sideload on Pixel Watch.
-- **Untested hypotheses** (survey questions 1–8 in the research doc): Pixel hub
+- **Verified on Matt's Pixel Watch 5 (2026-11-26)**: sensor list and gates (research doc,
+  "Verified" section). HR, steps, barometer, off-body are open; **skin temperature is open**
+  behind `READ_SKIN_TEMPERATURE`; no `TYPE_HEART_BEAT`; raw PPG/ECG/GSR are signature-gated.
+- **Untested hypotheses** (survey questions 1, 3, 4, 6–8 in the research doc): Pixel hub
   batching vs `hub-40s`, HR arbitration with the stock Google stack, stock-face
   complication slots accepting OpenWatch providers, Wear OS 7 tiles vs new Wear
   Widgets, bedtime/DND effect on night accelerometer, `TYPE_HEART_BEAT` presence,
@@ -69,11 +74,17 @@ data as an ordinary app can actually reach.
 
 ## Next actions
 
-1. **Survey a real Pixel Watch 5** (Matt's watches, already paired):
-   - enable wireless debugging, pair, `scripts/wear-install.sh --serial <ip>:<port>`
-   - `python3 -I scripts/wear-debug-report.py --serial <ip>:<port>`
-   - `adb -s <watch> shell dumpsys sensorservice | sed -n '/Sensor List/,/^$/p'`
-   - answer survey questions 1–8; write findings back into the research doc.
+1. **Finish the Pixel Watch 5 survey** (sensor list done; debug app installed):
+   - wear the watch off the charger for a day/night, then
+     `python3 -I scripts/wear-debug-report.py --serial <ip>:<port> --save <dir>` —
+     answers batching (Q3) and HR contention (Q4); compare with the stock app's HR.
+   - after the install script, also `pm grant` `ACTIVITY_RECOGNITION`,
+     `health.READ_SKIN_TEMPERATURE`, `health.READ_OXYGEN_SATURATION` —
+     `scripts/wear-install.sh` does not grant them (small script fix, ask Matt).
+   - Q1/Q6 (Health Services capabilities) need a small debug screen — code, ask Matt.
+   - Q7 (complication slots, tiles on Wear OS 7) and Q8 (night accelerometer) by hand.
+   - New candidates: probe `heart_rate_extended` (beat intervals?) and add a Pixel
+     skin-temperature route — both code, ask Matt.
 2. Decide the **Health Services dependency split** (fork keeps it if needed;
    upstream PR would present the Jetpack-library-vs-closed-`.aar` argument).
 3. Only after 1–2: implement code (P2 batching fallback / P3 HR duty-cycle
@@ -99,6 +110,20 @@ data as an ordinary app can actually reach.
   permission ≠ network permission, but check what a dependency drags in).
 
 ## Session journal (newest first)
+
+### 2026-11-26 — Claude Code (session: first on-device survey)
+- Set up this laptop to build: submodules initialised, Android SDK in `~/Android/Sdk`
+  (platform `android-37.0`, build-tools 37.0.0), `local.properties` (gitignored);
+  Gradle's foojay resolver provisions JDK 17 itself, so the system JDK 25 is fine.
+  `./gradlew :wear:assembleDebug` builds.
+- Paired over wireless debugging (`scripts/wear-pair.sh`). Developer options on
+  Wear OS 7: Settings → System → About → Versions → tap Build number 7×.
+- Watch: Pixel Watch 5 LTE (`wisteria_lte`), build `CP3A.260905.002`, API 37,
+  Health Services 0.99.6. Captured the sensor list into the research doc.
+- Installed the debug watch app; granted the permissions the script misses; first
+  report shows every recorder registered with `hub-40s` batches fitting the FIFOs.
+- Learned: skin temperature has an open raw route on Pixel; no `TYPE_HEART_BEAT`;
+  `heart_rate_extended` sits behind the public HR grant and is worth probing.
 
 ### 2026-11-26 — Lobe AI (session: durable setup)
 - Fork `mstrent/OpenWatch` created; clone moved to
