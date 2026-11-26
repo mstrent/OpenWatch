@@ -36,6 +36,18 @@ data as an ordinary app can actually reach.
 
 ## Decisions log
 
+- **2026-11-26 — Workspace accounts only; no consumer Gmail account required.** Every
+  route we build must work for a family member whose only Google account is
+  Workspace. Matt's test watch *also* carries a consumer Gmail account (secondary,
+  visible to the Fitbit/Google Health app), so a result seen on it can depend on
+  that account: a finding only counts once it holds without the consumer account
+  (e.g. Fitbit/Google Health signed out or on the Workspace account). This rules out,
+  as the plan's backbone, routes that need the Google Health (ex-Fitbit) app or its
+  cloud API: Workspace sign-in to Google Health is reported unsupported
+  (community reports, not verified here).
+- **2026-11-26 — Upstream acceptance is not a goal.** The fork can keep what
+  upstream would reject (e.g. a Health Services dependency); upstream PRs are optional.
+
 - **2026-11-26 — Fork is the working copy.** All Pixel work happens on
   `mstrent/OpenWatch` branch `pixel-watch-support`; PR back upstream only after
   the effort is done (a ways off). Ephemeral sandbox checkouts are not trusted for
@@ -126,7 +138,7 @@ data as an ordinary app can actually reach.
 - Health Services dumpsys: public passive types are HR/steps/distance/calories/floors/
   elevation/sleep detection; **no public SpO2/HRV/resp/skin-temp types**. Fitbit
   subscribes to unnamed `device_private` types. Matt OK'd proprietary Google routes
-  in principle (2026-11-26); options laid out for him, decision pending.
+  in principle (2026-11-26), with the Workspace-only constraint above.
 
 ### 2026-11-26 — Lobe AI (session: durable setup)
 - Fork `mstrent/OpenWatch` created; clone moved to
