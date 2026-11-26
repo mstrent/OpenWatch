@@ -2,6 +2,24 @@
 
 The implementation guide for anyone, agent or person, working in this repository.
 
+## Fork (added 2026-11-26 — drop this section before any PR upstream)
+
+This checkout is `mstrent/OpenWatch`, branch `pixel-watch-support`, a fork
+carrying a Pixel Watch 5 support effort that several AI assistants and machines
+take turns at.
+
+- **Read `docs/notes/pixel-watch-status.md` before working, and update it plus
+  push before finishing a session.** It is the durable memory: goal, decisions,
+  verified-vs-assumed facts, next actions, session journal.
+- The rules below are upstream's and still hold, with two fork-specific notes:
+  (1) adding a Google proprietary health API/library is **allowed here** when it
+  unlocks sensors or data, so long as the no-`INTERNET` watch invariant is
+  checked; the raw-sensors-only rule below still governs anything meant to merge
+  upstream. (2) Record fork-only state in `docs/notes/` or this section, never by
+  rewriting upstream-authored docs.
+- Sensor facts and open survey questions belong in
+  `docs/research/pixel-watch-sensor-map.md`.
+
 ## What this is
 
 OpenWatch is the devices half of OpenVitals: the Wear OS watch app (`:wear`), the
