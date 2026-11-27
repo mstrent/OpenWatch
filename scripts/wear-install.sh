@@ -97,6 +97,28 @@ grant_permissions() {
     done
 }
 
+compile_app() {
+    # A sideloaded install sits at the `verify` filter (JIT only) until Android's
+    # idle-and-charging dexopt, often the next night: on a Pixel Watch 5 that scrolled
+    # the dashboard ~17% janky (p90 65 ms) against ~2% (p90 22 ms) once compiled
+    # (2026-11-26, docs/notes/pixel-watch-status.md). Write the shipped baseline
+    # profile, then compile against it now, the AndroidX ProfileInstaller recipe.
+    # A debuggable build cannot be compiled (ART keeps it interpreted, ~45-65% janky),
+    # so smoothness is never judged on one.
+    if shell dumpsys package "$PACKAGE" | grep -q 'pkgFlags=.*DEBUGGABLE'; then
+        warn "debuggable build: ART runs it interpreted, so scrolling is janky by design. Judge smoothness on --release or an OPENWATCH_PUBLISHED_DEBUG_APK=true build."
+        return
+    fi
+    shell am broadcast -a androidx.profileinstaller.action.INSTALL_PROFILE \
+        -n "$PACKAGE/androidx.profileinstaller.ProfileInstallReceiver" >/dev/null 2>&1 || true
+    sleep 1
+    if shell cmd package compile -f -m speed-profile "$PACKAGE" | grep -q Success; then
+        note "compiled (speed-profile): smooth from the first launch"
+    else
+        warn "could not compile; the app runs JIT-only until the watch's overnight dexopt"
+    fi
+}
+
 status() {
     say "Status of $PACKAGE"
     if setup_done; then
@@ -168,6 +190,8 @@ if [ "$GRANT" = yes ]; then
     say "Permissions"
     grant_permissions
 fi
+say "Compiling"
+compile_app
 say "Launching"
 shell am start -W -n "$PACKAGE/$MAIN_ACTIVITY" >/dev/null && note "the watch app is on screen"
 sleep 3

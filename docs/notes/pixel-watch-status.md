@@ -18,7 +18,7 @@ Strava and Zepp) and are **visible on the watch face**, even when Google Health 
 Fitbit is absent or not signed in. Nice-to-have: expose as much Pixel Watch sensor
 data as an ordinary app can actually reach.
 
-## Status (as of 2026-11-26 evening: M0 verified, M1/M2 implemented)
+## Status (as of 2026-11-26 night: M0 verified, M1/M2 implemented, jank attributed)
 
 - **Phase: M1 (Pixel skin temperature) and M2 (install ergonomics) are implemented and
   locally gate-verified, committed and pushed on 2026-11-26** (journal below). What is
@@ -160,37 +160,17 @@ The watch:
 4. Before any push of code: `./gradlew verifyCi verifyWearCi` and
    `python3 scripts/sync-wiki.py --repo mstrent/OpenWatch --check`. (`verifyWearCi`
    passed on 2026-11-26 with the probe in the debug source set.)
-5. **Dashboard jank (from the 2026-11-26 jank session; nothing attributed yet).**
-   Housekeeping first: the watch's `screen_off_timeout` is still `600000` — restore it
-   to `10000` when jank work pauses.
-   1. Make `scripts/wear-jank-capture.sh` wake the watch and raise `screen_off_timeout`
-      itself; interim external workaround:
-      `adb -s <serial> shell settings put system screen_off_timeout 600000 && adb -s
-      <serial> shell input keyevent 224`
-   2. Compose compiler stability/metrics dump for `:wear` (no device needed) to test
-      whether `WearUiState` and the tile/metric models are unstable and force
-      recomposition.
-   3. Trace attribution of `reports/jank/trace.pb` in https://ui.perfetto.dev or a local
-      trace processor — resolve pids 11391/684 and correlate jank against `query`,
-      `generateTokenForPredictions`, `TextureOp`, `FillRectOp`, `FillRRectOp`,
-      `CircleOp`, `ScopedCodeCacheWrite`, `Compiling baseline`, plus the
-      VSync/surfaceflinger and input/window/scheduler tracks. Opening the trace
-      externally needs Matt's approval (it contains package/process/slice data);
-      installing a local trace processor is a download that also needs his approval.
-   4. debug vs non-debuggable-debug A/B on the watch:
-      `scripts/wear-jank-capture.sh -s <serial> -p tech.mmarca.openwatch.debug -r 5
-      -o reports/jank-debug`
-      `OPENWATCH_PUBLISHED_DEBUG_APK=true ./gradlew :wear:assembleDebug` (then install
-      and re-run the same harness). Interpretation: clean scroll on non-debuggable debug
-      means debug-only costs dominate; persistent jank means look at code paths before
-      UI micro-optimization. This does NOT isolate R8.
-   5. Crown/rotary baseline — still needed, no scripted method exists yet.
-   6. Deferred `:wear:benchmark` Macrobenchmark module, only after rungs 1-3 localize
-      the problem. Expected changes: `settings.gradle.kts` include,
-      `androidx.benchmark.macro.junit4`, uiautomator, a `benchmark` build type with
-      debug signing locally but `isDebuggable = false` and `isMinifyEnabled = true`,
-      lockfile/`gradle/verification-metadata.xml` updates. It must not alter shipped
-      `debug`/`ci`/`release`/`nightly` behaviour or default install scripts.
+5. **Dashboard jank — attributed and fixed for sideloads (2026-11-26 evening; journal).**
+   Cause: the **debuggable** build, not the UI code. ART runs a debuggable app
+   interpreted (simpleperf: 78% of the main thread in `ExecuteSwitchImplCpp`, framework
+   included) and refuses to compile it; a non-debuggable build sat JIT-only after
+   `adb install` until overnight dexopt. `wear-install.sh` now compiles non-debuggable
+   installs (`speed-profile` from the shipped baseline profile) and warns on debuggable
+   ones. Remaining, optional: the crown/rotary baseline; a generated app baseline profile
+   (`:wear:benchmark`) only if fresh Play/nightly installs prove janky — the library
+   profiles already ship in release APKs. **Never judge smoothness on a debuggable build.**
+   Trade-off: `DebugProtocol` and `run-as` (so `wear-debug-report.py`) need the debuggable
+   build; install it only for survey days.
 
 ## Development plan (if we start now, from what we know/assume)
 
@@ -278,6 +258,30 @@ Google Health. The existing Samsung paths for them stay untouched.
   permission ≠ network permission, but check what a dependency drags in).
 
 ## Session journal (newest first)
+
+### 2026-11-26 (night) — Claude Code (session: dashboard jank attributed)
+- `simpleperf record --app tech.mmarca.openwatch.debug -e cpu-clock -g` works on the
+  user-build watch (plain `-p <pid>` is refused; `--app` runs it in-app) and
+  `simpleperf report` prints on the watch, so no download is needed. During the scripted
+  swipes the main thread used 3.6 s of 9 s, 78% of it in libart's switch interpreter
+  (`ExecuteSwitchImplCpp`), including `Looper`/`Choreographer`: the whole process ran
+  interpreted.
+- A/B, same HEAD code, `wear-jank-capture.sh -r 3` each (median janky %, p90):
+  debuggable 63%/300 ms; debuggable + `compile -m speed` 42–46%/300 ms (status stays
+  `verify`: ART will not compile a debuggable app); non-debuggable
+  (`OPENWATCH_PUBLISHED_DEBUG_APK=true`) fresh `adb install` 17%/65 ms; same after
+  `compile -m speed-profile` **1.6–2%/22 ms, 0 missed vsync, p50 15 ms**; through the new
+  `wear-install.sh` path after `compile --reset` 1.7–2.4%/22 ms (the reset may keep the
+  earlier JIT profile, so not a strictly cold install).
+- Non-debuggable APKs already carry `assets/dexopt/baseline.prof` (library profiles,
+  Compose's included) plus ProfileInstaller 1.4.0; `adb install` just does not compile them.
+- `wear-install.sh`: new `compile_app` step (ProfileInstaller `INSTALL_PROFILE`
+  broadcast, then `cmd package compile -f -m speed-profile`); warns instead on a
+  debuggable install (`pkgFlags` contains `DEBUGGABLE`).
+- The watch now runs the **non-debuggable** HEAD debug build (includes M1 skin): the
+  protocol recorder is off and `run-as` is gone. Reinstall the debuggable build with
+  `scripts/wear-install.sh` (default debug APK) for the next survey day.
+  `screen_off_timeout` restored to 10000.
 
 ### 2026-11-26 — Lobe AI / pair-programmer (session: dashboard jank baseline captured on Pixel Watch 5)
 - **Emulator design gate:** an emulator is valid ONLY as a *relative* comparator — same
