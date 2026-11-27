@@ -52,7 +52,8 @@ internal fun MaterialScope.metricTileLayout(tile: MetricTileContent, open: Click
         mainSlot = {
             val parts = buildList {
                 add(basicText(tile.value.layoutString, tileValueStyle(tile.accent), maxLines = 1))
-                add(text(tile.caption.layoutString, typography = Typography.BODY_SMALL, color = colorScheme.onSurfaceVariant))
+                // Two lines: "2 more nights to set your baseline" ellipsized on one (emulator, 2026-11-27).
+                add(text(tile.caption.layoutString, typography = Typography.BODY_SMALL, color = colorScheme.onSurfaceVariant, maxLines = 2))
                 tile.chart?.let { chart ->
                     add(spacer(height = dp(CHART_GAP_DP)))
                     add(chartImage(chart, density))
