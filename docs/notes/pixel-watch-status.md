@@ -259,6 +259,31 @@ Google Health. The existing Samsung paths for them stay untouched.
 
 ## Session journal (newest first)
 
+### 2026-11-27 (late night) — Claude Code (session: skin temperature now + Google-Health-style variation)
+- Matt asked for skin temperature "right now" + graphed (for fun) and a tile/complication
+  "like Google Health's". Researched: Google Health shows skin temperature only as the nightly
+  variation from a 3-night baseline; the PW4/5 sensor reads all day (our probe saw ~30 s).
+  Decided with Matt: daytime readings stay on the watch, never Health Connect.
+- Spec `docs/superpowers/specs/2026-11-26-skin-temperature-now-and-variation-design.md`, plan
+  `docs/superpowers/plans/2026-11-26-skin-temperature-now-and-variation.md`. Built (commits
+  `16b49a4`..`d1e5b99`, `verifyWearCi` green):
+  - Raw-sensor watches record skin all day on the wrist (`RecorderPlan.Inputs.skinAllDay`);
+    minutes outside a sleep hold go to `WearMetrics.SKIN_TEMPERATURE_DAY` (key `skd`, 2 days,
+    **not in `WearMetrics.ALL`**, so never announced or served); held nights stay in
+    `SKIN_TEMPERATURE`, now kept a month + 2 days for the baseline. Non-wake-up sensor variant.
+  - `SkinVariation` (pure): night = median of a noon-to-noon window's minutes (≥30), baseline =
+    median of up to 30 earlier nights once ≥3 — the phone's numbers. °F deltas ×1.8.
+  - Dashboard card `MetricTile.SKIN_TEMPERATURE_NOW` ("Skin temp now"), offered where
+    `WatchSensors.skinSensor`; value only if the newest minute is ≤15 min old.
+  - `SkinTemperatureTileService` (+0.3° vs your baseline, last 7 nights as bars) and
+    `SkinTemperatureComplicationService` (SHORT_TEXT, hourly); "N more nights" until a baseline.
+  - The skin setting still defaults **off**; its text now says all day on Pixel.
+- **Not yet verified on the watch**: adb dropped before install. Next session: enable Wireless
+  debugging, `scripts/wear-install.sh` (debuggable, for `run-as`), turn skin on in watch
+  Settings → Recording, then check `skd` rows appear by day, a phone sync writes no new skin
+  record by day, the card shows a value, and the tile/complication render ("3 more nights").
+  Then reinstall the smooth build (`OPENWATCH_PUBLISHED_DEBUG_APK=true` build + wear-install).
+
 ### 2026-11-26 (night) — Claude Code (session: dashboard jank attributed)
 - `simpleperf record --app tech.mmarca.openwatch.debug -e cpu-clock -g` works on the
   user-build watch (plain `-p <pid>` is refused; `--app` runs it in-app) and
