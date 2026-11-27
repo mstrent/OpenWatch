@@ -155,7 +155,7 @@ private fun TransformingLazyColumnScope.recordingSettingsItems(
     // Skin temperature wherever a skin source exists: Pixel's raw sensor or the Samsung platform.
     if (skinAvailable) {
         val skin = settings.skinTemperature
-        setting(spec, if (skin) R.string.settings_skin_temperature_on else R.string.settings_skin_temperature_off, R.string.settings_skin_explained) {
+        setting(spec, if (skin) R.string.settings_skin_temperature_on else R.string.settings_skin_temperature_off, skinExplanation(samsung)) {
             actions.onSkinTemperature(!skin)
         }
     }
@@ -167,6 +167,11 @@ private fun TransformingLazyColumnScope.recordingSettingsItems(
         }
     }
 }
+
+/** Pixel's raw sensor records all day on the wrist; the Samsung platform only while you sleep. */
+@StringRes
+internal fun skinExplanation(samsung: Boolean): Int =
+    if (samsung) R.string.settings_skin_explained else R.string.settings_skin_explained_all_day
 
 /** One setting: a button that shows how it stands and switches it, and a line on what it does. */
 private fun TransformingLazyColumnScope.setting(spec: TransformationSpec, @StringRes label: Int, @StringRes explained: Int, onClick: () -> Unit) {
