@@ -43,7 +43,9 @@ import java.util.Locale
  * 3. whether this app may subscribe to the unnamed `health_services.device_private.<n>` passive
  *    types the vendor's health app uses, and what bytes they carry;
  * 4. what the vendor sensors behind public grants carry (`heart_rate_extended`,
- *    `skin_temperature`, `step_cadence`): their value arrays, raw.
+ *    `skin_temperature`, `step_cadence`): their value arrays, raw;
+ * 5. whether every type the device *lists* (passive and measure: on Wear OS 7 that can include
+ *    HRV, respiratory rate, skin temperature, SpO2, VO2 max and blood pressure) is delivered.
  *
  * Every line goes to `files/debug/probe-<time>.jsonl`, pulled with `run-as`. It writes nothing
  * else and stops itself. Start it with an optional `--ei seconds <n>` (default 90).
@@ -76,24 +78,35 @@ class HealthProbeActivity : ComponentActivity() {
             put("seconds", seconds)
         }
         val client = HealthServices.getClient(this)
-        capabilities(client)
+        val listed = capabilities(client)
         val sensors = rawSensors()
-        val hr = measureHeartRate(client)
-        val passive = passive(client, seconds)
+        // Off by default: health-services-client 1.1.0 crashes the app decoding a Blood Pressure
+        // point (ClassCastException DataProto$Value$DoubleArray → double[], Wear OS 7 emulator,
+        // 2026-11-27), before any callback of ours runs. `--ez measureAll true` to retry it.
+        val measureTypes = if (intent.getBooleanExtra("measureAll", false)) listed.measure + DataType.HEART_RATE_BPM else setOf(DataType.HEART_RATE_BPM)
+        (listed.measure - measureTypes).forEach { emit("measure.other.skipped") { put("type", it.name) } }
+        val measures = measureTypes.mapNotNull { measure(client, it) }
+        val passive = passive(client, seconds, listed.passive)
         delay(seconds * 1000L)
         runCatching { client.passiveMonitoringClient.flushAsync().await() }
             .onFailure { e -> emit("passive.flush.error") { put("error", e.toString()) } }
         delay(5_000)
         passive?.let { runCatching { client.passiveMonitoringClient.clearPassiveListenerCallbackAsync().await() } }
-        hr?.let { runCatching { client.measureClient.unregisterMeasureCallbackAsync(DataType.HEART_RATE_BPM, it).await() } }
+        measures.forEach { (type, callback) -> runCatching { client.measureClient.unregisterMeasureCallbackAsync(type, callback).await() } }
         sensors()
         emit("done") { put("file", out.name) }
         finish()
     }
 
-    private suspend fun capabilities(client: androidx.health.services.client.HealthServicesClient) {
+    /** What the device lists for this app, to subscribe to all of it. */
+    private class Listed(val passive: Set<DataType<*, *>>, val measure: Set<DeltaDataType<*, *>>)
+
+    private suspend fun capabilities(client: androidx.health.services.client.HealthServicesClient): Listed {
+        var passive: Set<DataType<*, *>> = emptySet()
+        var measure: Set<DeltaDataType<*, *>> = emptySet()
         runCatching { client.passiveMonitoringClient.getCapabilitiesAsync().await() }
             .onSuccess { c ->
+                passive = c.supportedDataTypesPassiveMonitoring
                 emit("caps.passive") {
                     put("dataTypes", names(c.supportedDataTypesPassiveMonitoring))
                     put("goalTypes", names(c.supportedDataTypesPassiveGoals))
@@ -103,7 +116,10 @@ class HealthProbeActivity : ComponentActivity() {
             }
             .onFailure { e -> emit("caps.passive.error") { put("error", e.toString()) } }
         runCatching { client.measureClient.getCapabilitiesAsync().await() }
-            .onSuccess { c -> emit("caps.measure") { put("dataTypes", names(c.supportedDataTypesMeasure)) } }
+            .onSuccess { c ->
+                measure = c.supportedDataTypesMeasure
+                emit("caps.measure") { put("dataTypes", names(c.supportedDataTypesMeasure)) }
+            }
             .onFailure { e -> emit("caps.measure.error") { put("error", e.toString()) } }
         runCatching { client.exerciseClient.getCapabilitiesAsync().await() }
             .onSuccess { c ->
@@ -114,20 +130,26 @@ class HealthProbeActivity : ComponentActivity() {
                 }
             }
             .onFailure { e -> emit("caps.exercise.error") { put("error", e.toString()) } }
+        return Listed(passive, measure)
     }
 
-    private fun measureHeartRate(client: androidx.health.services.client.HealthServicesClient): MeasureCallback? {
+    /** One measure callback for [type]; heart rate keeps its old `measure.hr.*` labels. */
+    private fun measure(
+        client: androidx.health.services.client.HealthServicesClient,
+        type: DeltaDataType<*, *>,
+    ): Pair<DeltaDataType<*, *>, MeasureCallback>? {
+        val label = if (type == DataType.HEART_RATE_BPM) "measure.hr" else "measure.other"
         val callback = object : MeasureCallback {
-            override fun onRegistered() = emit("measure.hr.registered")
+            override fun onRegistered() = emit("$label.registered") { put("type", type.name) }
             override fun onRegistrationFailed(throwable: Throwable) =
-                emit("measure.hr.failed") { put("error", throwable.toString()) }
+                emit("$label.failed") { put("type", type.name); put("error", throwable.toString()) }
             override fun onAvailabilityChanged(dataType: DeltaDataType<*, *>, availability: Availability) =
-                emit("measure.hr.availability") { put("value", availability.toString()) }
+                emit("$label.availability") { put("type", dataType.name); put("value", availability.toString()) }
             override fun onDataReceived(data: DataPointContainer) =
-                emit("measure.hr.data") { put("points", points(data)) }
+                emit("$label.data") { put("points", points(data)) }
         }
-        return runCatching { client.measureClient.registerMeasureCallback(DataType.HEART_RATE_BPM, callback); callback }
-            .onFailure { e -> emit("measure.hr.error") { put("error", e.toString()) } }
+        return runCatching { client.measureClient.registerMeasureCallback(type, callback); type to callback }
+            .onFailure { e -> emit("$label.error") { put("type", type.name); put("error", e.toString()) } }
             .getOrNull()
     }
 
@@ -136,12 +158,19 @@ class HealthProbeActivity : ComponentActivity() {
      * matters), and fall back to the public set only if the private registration is refused.
      * The public set is always included so data from it shows the callback works at all.
      */
-    private fun passive(client: androidx.health.services.client.HealthServicesClient, seconds: Int): PassiveListenerCallback? {
-        val public = setOf(
+    private fun passive(
+        client: androidx.health.services.client.HealthServicesClient,
+        seconds: Int,
+        listed: Set<DataType<*, *>>,
+    ): PassiveListenerCallback? {
+        val known = setOf(
             DataType.HEART_RATE_BPM, DataType.STEPS, DataType.DISTANCE, DataType.CALORIES, DataType.FLOORS,
             DataType.ELEVATION_GAIN, DataType.STEPS_DAILY, DataType.CALORIES_DAILY, DataType.DISTANCE_DAILY,
             DataType.FLOORS_DAILY,
         )
+        // Everything the device lists, by its own DataType objects: names this library has no
+        // constant for (Wear OS 7's vitals) still round-trip.
+        val public = known + listed
         val private: Set<DataType<*, *>> = PRIVATE_IDS.map {
             DeltaDataType("health_services.device_private.$it", DataType.TimeType.INTERVAL, ByteArray::class.java)
         }.toSet()

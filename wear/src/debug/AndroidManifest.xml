@@ -3,6 +3,13 @@
      Exported so the survey can start it over adb:
      adb shell am start -n tech.mmarca.openwatch.debug/tech.mmarca.openwatch.wear.debug.HealthProbeActivity -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The Wear OS 7 vitals Health Services lists (probe, 2026-11-27): ordinary runtime
+         permissions, unlike the vendor's OEM_OPAQUE_DATA_ACCESS. Debug only until a
+         recorder uses them. -->
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE_VARIABILITY" />
+    <uses-permission android:name="android.permission.health.READ_RESPIRATORY_RATE" />
+    <uses-permission android:name="android.permission.health.READ_VO2_MAX" />
+    <uses-permission android:name="android.permission.health.READ_BLOOD_PRESSURE" />
     <application>
         <activity
             android:name="tech.mmarca.openwatch.wear.debug.HealthProbeActivity"

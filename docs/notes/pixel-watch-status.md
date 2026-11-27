@@ -302,6 +302,25 @@ Google Health. The existing Samsung paths for them stay untouched.
 
 ## Session journal (newest first)
 
+### 2026-11-27 (midday) — Claude Code (session: Wear OS 7 vitals through Health Services)
+- Matt wants HRV, respiratory rate, skin temperature, SpO2, VO2 max and blood pressure.
+  The probe now subscribes to **every type Health Services lists** (passive) and every listed
+  measure type (opt-in, see below).
+- **Wear OS 7.0 emulator, no Google account: all of them reach an ordinary app** through the
+  public API once four ordinary Android 17 runtime permissions are held:
+  `health.READ_HEART_RATE_VARIABILITY`, `READ_RESPIRATORY_RATE`, `READ_VO2_MAX`,
+  `READ_BLOOD_PRESSURE` (skin temperature and SpO2 use the ones the app already has). Not
+  signature-gated, unlike `OEM_OPAQUE_DATA_ACCESS`. Over 120 s: HRV RMSSD/SDNN/pNN50,
+  respiratory rate, skin temperature, SpO2 every ~6 s, VO2 max once — **flat synthetic
+  values** (20/40/5, 12, 33, 95, 30), so the path is proven, not any sensor.
+- **Blood pressure**: the measure registers and data arrives, but `health-services-client`
+  1.1.0 (newest on Google Maven) crashes the app decoding it (`ClassCastException
+  DataProto$Value$DoubleArray → double[]` in `DataType.toProtoFromValue`), before our callback.
+  The probe skips non-HR measure types unless `--ez measureAll true`.
+- The permissions are declared in `wear/src/debug/AndroidManifest.xml` only (probe use).
+- **Next: the same probe on the real Pixel Watch 5.** On 2026-11-26 it listed none of these;
+  the question now is whether that holds on its current firmware with the permissions held.
+
 ### 2026-11-27 (afternoon) — Claude Code (session: distribution options + upstream rule wording)
 - Discussed distribution for the family. Upstream already publishes
   `tech.mmarca.openwatch` on Play (README pipeline; listing page exists, its track and
