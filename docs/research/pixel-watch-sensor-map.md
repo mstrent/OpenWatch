@@ -186,6 +186,28 @@ Workspace-only watch before relying on the Health Services rows.
   about every 30 s: 24.7 °C off the wrist, rising from 29.8 to 30.6 °C after putting it on.
 - **`step_cadence`** reports `-1` at rest; its walking values are not yet seen.
 
+## Verified: a day of wear (2026-11-26, debug watch app, 08:56–21:32)
+
+`wear-debug-report.py` over 12.6 h on Matt's wrist (Pixel Watch 5, API 37, batching profile
+`hub-40s`, heart rate every 10 s from the raw sensor, Google Health running alongside with a
+consumer account):
+
+- **Batches arrive (Q3).** Every recorder's registration fits its FIFO (heart rate wake-up
+  3000, accelerometer/pressure/step counter 3000). In doze the app woke ~145 times an hour
+  (1826 flush cycles, mean 70 ms awake each, one timeout), i.e. the hub delivered about every
+  25 s, sooner than the 40 s latency asked for; no batch was lost for heart rate.
+- **No heart rate freeze beside the stock stack (Q4).** 744 worn minutes, 22,535 heart rate
+  events (~30 a minute from the 1 Hz registration); no worn stretch longer than 2 min without
+  an event except 09:01–09:14, which was the probe/setup window. Google Health kept writing its
+  own per-minute heart rate to Health Connect over the same hours, so neither reader froze.
+- **Drain** (on battery, between snapshots): doze 2.24 %/h (10.7 h), screen off but awake
+  4.9 %/h, screen on 20 %/h; 100 % → 64 % over the day. Wireless debugging was on for part
+  of it.
+- **Accelerometer completeness is partial**: 13,447 readings/h in doze, 16,927 dark,
+  18,512 screen-on, against 22,500 for whole minutes — about 60 % in doze. Matters for the
+  sleep estimate (Q8); not yet explained (non-wake sensor, FIFO not overflowing on paper).
+- Skin tracker 0 events: the watch was still running the pre-M1 build (installed 09:22).
+
 ## What ordinary apps reach on Pixel Watch (reported, not verified here)
 
 Through the raw sensor door:
@@ -225,7 +247,7 @@ third-party apps does not.
 
 | Metric | Route on Pixel Watch | In OpenWatch |
 |---|---|---|
-| Heart rate, steps, ascent | Raw sensors, the same code as on Galaxy; contention with the stock stack is the open question. Health Services is the alternate route, and the vendor's own step pipeline rather than `step_counter` | built on raw, unverified on Pixel |
+| Heart rate, steps, ascent | Raw sensors, the same code as on Galaxy. **Verified 2026-11-26:** a day of wear with no contention freeze, batches arrive, and sync lands heart rate and steps in Health Connect (M0). Health Services stays the alternate route | built on raw, **works on Pixel** |
 | Sleep stages | From heart rate and motion (`SleepStageEstimator`); Health Services may offer the vendor's own sleep on a device that supports it | built, unverified on Pixel |
 | HRV (RMSSD), respiratory rate | Needs beat intervals. **Verified closed on Pixel Watch 5 (2026-11-26):** no `TYPE_HEART_BEAT`, raw PPG signature-gated, `heart_rate_extended` carries no intervals, and Health Services lists no public HRV/respiratory type (the private ones need `OEM_OPAQUE_DATA_ACCESS`) | degrades off by the capability gate |
 | SpO2 | **Verified closed (2026-11-26):** no SpO2 sensor listed; no public Health Services type | degrades off |
@@ -271,10 +293,11 @@ signed in or out.
 2. ~~The full sensor list with permission gates~~ — **answered 2026-11-26**: heart rate is gated by
    `READ_HEART_RATE` only (on Android 17); see the verified capture above. New follow-up: what do
    `heart_rate_extended` and `step_cadence` carry in their event values?
-3. Does the Pixel hub hold the `hub-40s` batches, or does the recorder registration need a
-   shorter report latency on this watch?
-4. Does continuous batched heart rate recording beside the stock stack freeze either reader — and
-   does reading through Health Services avoid the fight?
+3. ~~Does the Pixel hub hold the `hub-40s` batches?~~ — **answered 2026-11-26: yes**, delivered
+   about every 25 s in doze; see "a day of wear" above. Follow-up: why the accelerometer is only
+   ~60 % whole in doze.
+4. ~~Does batched heart rate beside the stock stack freeze either reader?~~ — **answered
+   2026-11-26: no** over 12.6 h (consumer-account watch; repeat once on a Workspace-only watch).
 5. ~~Is `TYPE_HEART_BEAT` present?~~ — **answered 2026-11-26: no.** HRV on the raw path stays off
    unless `heart_rate_extended` turns out to carry beat intervals.
 6. ~~Which Health Services data types does a Pixel Watch 5 list?~~ — **answered 2026-11-26**:

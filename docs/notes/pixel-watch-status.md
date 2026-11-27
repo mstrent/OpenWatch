@@ -18,15 +18,20 @@ Strava and Zepp) and are **visible on the watch face**, even when Google Health 
 Fitbit is absent or not signed in. Nice-to-have: expose as much Pixel Watch sensor
 data as an ordinary app can actually reach.
 
-## Status (as of 2026-11-26, after the M1/M2 implementation pass)
+## Status (as of 2026-11-26 evening: M0 verified, M1/M2 implemented)
 
 - **Phase: M1 (Pixel skin temperature) and M2 (install ergonomics) are implemented and
   locally gate-verified, committed and pushed on 2026-11-26** (journal below). What is
   left for M1/M2 is the on-watch bench check. The on-device survey continues (steps
   3–4 collecting).
-- Survey steps 1–2 **done** on Matt's Pixel Watch 5 (sensor list; Health Services via
-  dumpsys and the on-watch probe). Steps 3–4 (all-day batching, HR contention) are
-  **collecting**: the debug watch app was left recording on Matt's wrist on 2026-11-26.
+- **M0 done 2026-11-26: the minimum bar works end to end.** Debug phone app on Matt's
+  Pixel 10 Pro, watch linked (companion association + Validate), 30-min auto-sync and
+  manual sync both run; **heart rate and steps are in Health Connect under "OpenWatch"**
+  (checked in Health Connect's own Data and access screens). Tiles/complications (Q7) are
+  still to be tried on the wrist.
+- Survey steps 1–4 **done** on Matt's Pixel Watch 5. Day of wear (12.6 h): `hub-40s`
+  batches arrive (Q3), **no heart rate freeze beside the stock stack** (Q4), doze drain
+  2.24 %/h; accelerometer only ~60 % whole in doze (new follow-up, matters for sleep).
 - **Feasibility verdict: the minimum bar is reachable** with what an ordinary app gets
   (raw heart rate + step counter, unchanged OpenWatch code paths), pending the all-day
   data. Beyond the bar: skin temperature is newly reachable (raw sensor; OpenWatch now
@@ -138,15 +143,20 @@ The watch:
 
 ## Next actions
 
-1. **Pull Matt's day of wear** (debug app recording since 2026-11-26 ~09:40):
-   `wear-debug-report.py --save`; answer Q3 (do `hub-40s` batches arrive?) and Q4 (does
-   HR freeze beside the stock stack?). Ask Matt whether the stock HR ever froze.
+1. **M0 leftovers:** add OpenWatch's tiles and a complication on the stock Pixel face
+   (Q7); install the current watch build (`scripts/wear-install.sh`; the watch still runs
+   the 09:22 pre-M1 build) and do the M1 bench check — skin rows after a night, and the
+   phone's skin toggle appearing. Strava/Zepp: Strava only reads workouts from Health
+   Connect, so nothing to see until a workout is recorded; Zepp not checked.
+   Note: Google Health also writes the watch's steps/HR to Health Connect, so with both apps
+   present Health Connect's app priority decides which counts (total did not double: 3,532).
 2. **Repeat the probe on a Workspace-only watch** (another family watch, or Google
    Health signed out on Matt's). Decides whether the Health Services rows hold.
 3. The development plan below: **M1 and M2 are implemented, gated and pushed** (see
    journal), including the phone-side parity follow-up (skin_sensor token + phone skin
    toggle for raw-sensor watches, 2026-11-26) — what is left is the M1 on-watch bench check.
-   Matt's OK per milestone still gates what follows: M3 depends on step 1, M4 on step 2.
+   Matt's OK per milestone still gates what follows: M3 (step 1's data is in: batching is
+   fine, so M3 narrows to the doze accelerometer gap), M4 on step 2.
 4. Before any push of code: `./gradlew verifyCi verifyWearCi` and
    `python3 scripts/sync-wiki.py --repo mstrent/OpenWatch --check`. (`verifyWearCi`
    passed on 2026-11-26 with the probe in the debug source set.)
@@ -156,7 +166,8 @@ The watch:
 Ordered by value and by how little it depends on open questions. Assumptions are
 flagged; each milestone ends with an on-watch check, a status-doc update and a push.
 
-**M0 — End-to-end baseline, no code (½ day).** Assumes the existing raw paths just work
+**M0 — End-to-end baseline, no code (½ day).** **Done 2026-11-26** except Q7 (see
+Status). Originally: assumes the existing raw paths just work
 on Pixel, which the survey so far supports. Pair Matt's Pixel phone with the debug phone
 app (`./gradlew :app:installDebug`, the watch app is the debug build already), add the
 watch as a Wear OS watch, sync, and confirm **heart rate and steps land in Health
@@ -236,6 +247,23 @@ Google Health. The existing Samsung paths for them stay untouched.
   permission ≠ network permission, but check what a dependency drags in).
 
 ## Session journal (newest first)
+
+### 2026-11-26 (evening) — Claude Code (session: M0 + day-of-wear report)
+- Paired the phone over Wireless debugging (Pixel 10 Pro, API 37), `./gradlew :app:assembleDebug`
+  and installed `tech.mmarca.openwatch.debug`; Matt granted Health Connect, added the watch,
+  allowed the association and validated. Association id 5 on the phone.
+- Verified sync without screens first: the phone app is debuggable, so
+  `adb shell run-as tech.mmarca.openwatch.debug cat databases/openwatch.db(-wal)` + Python sqlite
+  shows `device_state` cursors (`hr_cursor`, `steps_cursor`, `ascent_cursor`, `sleep_cursor`;
+  `hv`/`rr`/`o2` stay `t0` as expected). `dumpsys healthconnect` shows OpenWatch "Contributed
+  Data: true" but no per-type counts; the Health Connect UI (Data and access → Steps / Heart
+  rate) showed OpenWatch entries.
+- Live manual sync log (`logcat` tag `OpenWatchWearOs`): 100 HR samples in 19 min (10 s
+  cadence), steps 4 minutes, ascent 0 floors (3.1 m without steps), sleep 0 nights (daytime),
+  hrv/breathing/spo2 0, then zones/profile/days sent to the watch.
+- Day-of-wear report pulled to the scratchpad (personal data, not committed); findings in the
+  research doc's "a day of wear" section; Q3 and Q4 answered.
+- Tip: set the phone not to lock (Matt did) or every screenshot/uiautomator dump comes back black.
 
 ### 2026-11-26 — Lobe AI / pair-programmer (session: phone-side parity follow-up)
 - **Skin strings vendor-neutral across 15 locales** (`values-{ar,cs,de,es,et,fi,fr,gl,it,iw,ja,pl,pt,ru,zh-rCN}/strings.xml`): `settings_skin_temperature_on` / `settings_skin_explained` no longer say Samsung. SpO2/HRV/HR-source strings **stay Samsung-worded by design** — those routes really are Samsung-only.
