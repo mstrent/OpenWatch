@@ -143,30 +143,39 @@ The watch:
   the repo): `adb shell dumpsys account`.
 
 Emulators (set up 2026-11-27; a functional bench, never a performance or Pixel-hub one —
-see the emulator design gate in the 2026-11-26 Lobe AI journal entry):
+see the emulator design gate in the 2026-11-26 Lobe AI journal entry). **Current pair: Wear OS
+7.0 watch + Android 17 phone**, matching the Pixel Watch 5 / Pixel phones:
 
-- `sdkmanager "emulator" "system-images;android-35-ext15;android-wear;x86_64"
-  "system-images;android-36;google_apis;x86_64"` (no Wear OS 6 image is offered), then
-  `avdmanager create avd -n ow_watch -k "system-images;android-35-ext15;android-wear;x86_64"
-  -d wearos_large_round` and `-n ow_phone -k "system-images;android-36;google_apis;x86_64"
-  -d pixel_6`. Boot: `emulator -avd ow_watch -port 5554 -no-snapshot-save` and
-  `emulator -avd ow_phone -port 5556 -no-snapshot-save` → `emulator-5554` / `emulator-5556`.
-- Both images are userdebug: `adb root` works and `sqlite3` is on the watch, so the
-  watch's `databases/metrics.db` (table `rows`: `metric, time_ms, line, seq`) can be
-  seeded directly. Force-stop the app first; a tile keeps its read for 5 min, so
-  remove/add it (`am broadcast -a com.google.android.wearable.app.DEBUG_SURFACE --es
-  operation remove-tile|add-tile --ecn component <pkg>/<TileService>`) to see new data.
-  Complications: `--es operation set-complication --ecn component <provider> --ecn
-  watchface <face> --ei slot <n> --ei type 3`; Orbita (default face) has no slots, use
-  `...watchface.rwf/...utilita.UtilitaWatchFaceService` (`--es operation set-watchface`).
-- **The real link works between them**: netsim carries classic Bluetooth and RFCOMM.
-  Watch discoverable (`am start -a android.bluetooth.adapter.action.REQUEST_DISCOVERABLE`),
-  pair in phone Settings → Pair new device, phone OpenWatch → Pair a watch, then on the
-  watch OpenWatch → Settings → Phone → Allow (the notification's buttons did not take
-  emulator taps). Phone grants: `pm grant` each `android.permission.health.*` and
-  `dumpsys deviceidle whitelist +<pkg>`.
-- Limits: the watch emulator has heart rate but **no skin temperature sensor**, so the
-  watch does not announce `sk` and skin sync cannot be exercised end to end there.
+- **Command-line tools ≥ 23.0 first** (`sdkmanager "cmdline-tools;latest"`). Tools 19.0
+  created API 37 AVDs with `target=android-0` (check `~/.android/avd/<name>.ini`), and those
+  boot-loop: SurfaceFlinger aborts on `!rcEnc->featureInfo()->hasReadColorBufferDma`, or the
+  emulator itself segfaults in its RenderThread. No GPU/feature flag fixed it; recreating the
+  AVD with new tools did. (Old tools kept in `cmdline-tools/19.0-old`.)
+- Images: `system-images;android-37.0;android-wear-signed;x86_64` (Wear OS 7.0; the Wear OS
+  6+ images carry the `android-wear-signed` tag, not `android-wear`) and
+  `system-images;android-37.0;google_apis;x86_64`. AVDs: `ow_watch7` (`wearos_large_round`)
+  and `ow_phone17` (`pixel_9_pro`), both `hw.ramSize=4096` (API 37's documented minimum),
+  everything else default. Boot: `emulator -avd ow_watch7 -port 5554 -no-snapshot-save` and
+  `emulator -avd ow_phone17 -port 5556 -no-snapshot-save`. The "suggested 16 GB host RAM"
+  popup is advisory. Two API 37 AVDs take ~8 GB; stop Gradle daemons first on a 16 GB host.
+- The watch image is a `user` build (signed, no root, no `sqlite3`): seed its store by
+  `run-as <pkg> cat databases/metrics.db` out, edit locally with Python sqlite (checkpoint the
+  WAL, `journal_mode=DELETE`), force-stop the app, delete `-wal`/`-shm`, and `adb exec-in
+  run-as <pkg> sh -c 'cat > databases/metrics.db'` back. Table `rows`: `metric, time_ms,
+  line, seq`. A tile keeps its read for 5 min; `DEBUG_SURFACE remove-tile`/`add-tile` (and
+  `DEBUG_SYSUI show-tile`) forces a new one.
+- Complications: `DEBUG_SURFACE set-complication` works on Wear OS 5.1 faces (Utilita) but
+  not on Wear OS 7's declarative faces ("Watch face package is not installed"); add by hand.
+- **The real link works**: netsim carries classic Bluetooth + RFCOMM. Watch discoverable
+  (`am start -a android.bluetooth.adapter.action.REQUEST_DISCOVERABLE`), pair in phone
+  Settings → Pair new device, phone OpenWatch → Pair a watch → Allow (companion), then on the
+  watch OpenWatch → Settings → Phone → Allow (the notification's buttons ignore emulator
+  taps). Phone grants: `pm grant` each `android.permission.health.*`, `dumpsys deviceidle
+  whitelist +<pkg>`. `uiautomator dump` + tap-by-text beats coordinates.
+- Limits: neither watch image has a skin temperature sensor, so the watch does not announce
+  `sk` and skin sync cannot be exercised end to end. The older Wear OS 5.1 / Android 16 pair
+  (`ow_watch`, `ow_phone`) is still installed and boots with defaults; its watch is userdebug
+  (root + `sqlite3`).
 
 ## Next actions
 
@@ -284,6 +293,23 @@ Google Health. The existing Samsung paths for them stay untouched.
   permission ≠ network permission, but check what a dependency drags in).
 
 ## Session journal (newest first)
+
+### 2026-11-27 (late morning) — Claude Code (session: emulators moved to Wear OS 7 + Android 17)
+- Matt pointed out Wear OS 6+ images exist (tag `android-wear-signed`, which my search
+  missed). Moved the bench to Wear OS 7.0 + Android 17 to match his devices.
+- **Lost time to a tooling bug**: the AVDs boot-looped through several RAM/GPU changes until a
+  web search matched our `hasReadColorBufferDma` abort to command-line tools 19.0 writing
+  `target=android-0`. Updating to 23.0 and recreating the AVDs fixed it with default graphics.
+  Lesson: read the docs/search before tuning flags.
+- On Wear OS 7: the skin tile renders "+0.4°" with the same 7 bars; the phone pairs, links
+  and syncs over emulated Bluetooth (`Served the phone link: SERVED`).
+- **Account-free Health Services on Wear OS 7** (0 Google accounts): measured HR (89 points)
+  and passive HR/steps/calories/distance/floors delivered, as on 5.1. **New**: Wear OS 7's
+  Health Services *lists* passive HRV (RMSSD/SDNN/PNN50), respiratory rate, skin temperature,
+  SpO2 and VO2 max, and a Blood Pressure measure type, all absent on the Pixel Watch 5
+  (2026-11-26). So public types for the vitals exist in the platform; the Pixel chooses not
+  to offer them (and the emulator likely advertises everything off synthetic data). Delivery
+  of those types was not probed (the probe subscribes only to the older set).
 
 ### 2026-11-27 (morning) — Claude Code (session: emulator bench)
 - Watch + phone emulators set up (commands in "Working on this"). Debug builds of both

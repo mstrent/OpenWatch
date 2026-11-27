@@ -292,7 +292,9 @@ signed in or out.
    with the vendor app signed out? (2026-11-27: on the stock Wear OS 5.1 emulator with no
    Google account at all, Health Services delivers measured and passive HR, steps,
    calories, distance and floors — the platform needs no account; the Pixel's
-   vendor-backed stack is still unverified.)
+   vendor-backed stack is still unverified. Same on the Wear OS 7.0 emulator, whose Health Services
+   additionally *lists* passive HRV, respiratory rate, skin temperature, SpO2, VO2 max and a
+   Blood Pressure measure type — none offered by the Pixel Watch 5.)
 2. ~~The full sensor list with permission gates~~ — **answered 2026-11-26**: heart rate is gated by
    `READ_HEART_RATE` only (on Android 17); see the verified capture above. New follow-up: what do
    `heart_rate_extended` and `step_cadence` carry in their event values?
