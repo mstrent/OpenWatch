@@ -61,4 +61,10 @@ class SkinTemperatureRecorderTest {
         )
         assertEquals(listOf(WearLinkProtocol.SkinMinute(minute, 3420, 2220)), rows)
     }
+
+    @Test
+    fun `a held night's minutes sync, the day's stay on the watch`() {
+        assertEquals(WearMetrics.SKIN_TEMPERATURE, SkinTemperatureRecorder.metricFor(sleepHolding = true))
+        assertEquals(WearMetrics.SKIN_TEMPERATURE_DAY, SkinTemperatureRecorder.metricFor(sleepHolding = false))
+    }
 }

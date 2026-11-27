@@ -1,6 +1,7 @@
 package tech.mmarca.openwatch.wear
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -91,4 +92,10 @@ class WearMetricsTest {
     }
 
     private fun <T> roundTrip(metric: WearMetric<T>, value: T): T? = metric.decode(metric.encode(value))
+
+    @Test
+    fun `daytime skin minutes stay on the watch and nights are kept a month`() {
+        assertFalse(WearMetrics.SKIN_TEMPERATURE_DAY.key in WearMetrics.ALL.map { it.key })
+        assertTrue(WearMetrics.SKIN_TEMPERATURE.retentionMillis >= 31L * 24 * 60 * 60 * 1000)
+    }
 }

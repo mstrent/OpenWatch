@@ -63,6 +63,15 @@ class RecorderPlanTest {
     }
 
     @Test
+    fun `a raw skin sensor records skin temperature all day on the wrist`() {
+        val allDay = day.copy(skinAllDay = true)
+        assertTrue(RecorderPlan.decide(allDay).skinTemperature)
+        assertFalse("off the wrist it rests", RecorderPlan.decide(allDay.copy(worn = false)).skinTemperature)
+        assertFalse("the setting still rules", RecorderPlan.decide(allDay.copy(settings = settings.copy(skinTemperature = false))).skinTemperature)
+        assertFalse("and the grant", RecorderPlan.decide(allDay.copy(skinTemperatureGranted = false)).skinTemperature)
+    }
+
+    @Test
     fun `a workout reads the sensor live, whatever the source setting, and the day goes back to it`() {
         val samsung = day.copy(settings = settings.copy(heartRateSource = MeasurementSource.SAMSUNG_PLATFORM))
 

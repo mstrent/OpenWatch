@@ -166,7 +166,12 @@ internal class WearGraph(private val app: Application) {
         )
     }
 
-    val skinTemperature: SkinTemperatureRecorder by lazy { SkinTemperatureRecorder(store, skinSource, debug) }
+    val skinTemperature: SkinTemperatureRecorder by lazy {
+        SkinTemperatureRecorder(store, skinSource, debug, isSleepHolding = { sleepMinutes.isSleepHolding })
+    }
+
+    /** Pixel's raw skin sensor records all day on the wrist; the Samsung tracker only in a sleep hold. */
+    val skinAllDay: Boolean get() = skinSource is SensorSkinTemperatureSource
 
     val spo2: Spo2Recorder by lazy {
         Spo2Recorder(app, store, spo2Source, debug, isHolding = { linkState.state.value.sleepHoldActive }, claim = spo2Claim)

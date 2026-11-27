@@ -132,6 +132,22 @@ object WearMetrics {
         decode = WearLinkProtocol::parseSkinMinute,
         timeOf = { it.epochMillis },
         onSameTime = WearMetric.OnSameTime.REPLACE,
+        // A month and two days: the nightly variation's baseline reads up to 30 earlier nights.
+        retentionMillis = WearMetric.MONTH_MILLIS + 2L * 24 * 60 * 60 * 1000,
+    )
+
+    /**
+     * Skin temperature per clock minute outside a sleep hold, from Pixel's raw sensor
+     * all day. Watch only: not in [SERIES] or [ALL], so the link never announces or
+     * serves it and no daytime minute becomes a "night" in Health Connect.
+     */
+    val SKIN_TEMPERATURE_DAY = WearMetric(
+        key = "skd",
+        encode = WearLinkProtocol::formatSkinMinute,
+        decode = WearLinkProtocol::parseSkinMinute,
+        timeOf = { it.epochMillis },
+        onSameTime = WearMetric.OnSameTime.REPLACE,
+        retentionMillis = 2L * 24 * 60 * 60 * 1000,
     )
 
     /** One SpO2 spot measurement at night from the Samsung platform; see `Spo2Recorder`. Final once taken. */

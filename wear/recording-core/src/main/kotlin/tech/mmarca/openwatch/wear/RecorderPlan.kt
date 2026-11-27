@@ -38,6 +38,8 @@ object RecorderPlan {
          * step counter hands its steps over at once, so the screens follow them as they come.
          */
         val interactive: Boolean = false,
+        /** The skin source is Pixel's raw sensor, which records all day on the wrist, not only in a sleep hold. */
+        val skinAllDay: Boolean = false,
     )
 
     data class Plan(
@@ -86,7 +88,7 @@ object RecorderPlan {
         } else {
             HeartRateInterval.OFF
         }
-        // Skin temperature comes only from the Samsung platform, and only while sleep is held on the wrist.
+        // Skin temperature while sleep is held on the wrist; a raw skin sensor also all day on the wrist.
         val night = granted && inputs.worn && inputs.sleepHolding
         val live = heartRate != HeartRateInterval.OFF && active
         val steps = inputs.stepsGranted && inputs.hasStepCounter
@@ -102,7 +104,7 @@ object RecorderPlan {
             ascent = inputs.hasBarometer,
             // The raw PPG sits under the heart rate grant.
             nightHrv = granted,
-            skinTemperature = night && settings.skinTemperature && inputs.skinTemperatureGranted,
+            skinTemperature = (night || (inputs.skinAllDay && inputs.worn)) && settings.skinTemperature && inputs.skinTemperatureGranted,
             spo2 = granted && settings.spo2AtNight && inputs.oxygenSaturationGranted,
         )
     }

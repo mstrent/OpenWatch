@@ -74,7 +74,14 @@ internal class SensorSkinTemperatureSource(
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
 
-    private fun skinSensor(): Sensor? = sensorManager.getSensorList(Sensor.TYPE_ALL).firstOrNull { it.stringType == SKIN_SENSOR_TYPE }
+    /**
+     * The non-wake-up variant where there is one: recording all day, it must not wake the
+     * processor every ~30 s; its points wait in the FIFO for the next wake-up (the heart
+     * rate's batches come about every 25 s on Pixel).
+     */
+    private fun skinSensor(): Sensor? = sensorManager.getSensorList(Sensor.TYPE_ALL)
+        .filter { it.stringType == SKIN_SENSOR_TYPE }
+        .let { found -> found.firstOrNull { !it.isWakeUpSensor } ?: found.firstOrNull() }
 
     companion object {
         private const val SKIN_SENSOR_TYPE = "com.google.sensor.skin_temperature"

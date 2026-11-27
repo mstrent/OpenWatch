@@ -22,6 +22,8 @@ internal class SkinTemperatureRecorder(
     private val store: MetricStore,
     private val source: SpotSource<SkinReading>,
     private val debug: DebugProtocol,
+    /** Whether sleep is held now: a held minute syncs, any other stays on the watch ([metricFor]). */
+    private val isSleepHolding: () -> Boolean = { true },
 ) : Recorder, SpotSource.Sink<SkinReading> {
 
     private var thread: HandlerThread? = null
@@ -67,8 +69,9 @@ internal class SkinTemperatureRecorder(
         debug.count("skin.points", readings.size.toLong())
         debug.count("skin.rows", rows.size.toLong())
         if (rows.isEmpty()) return
-        store.putAll(WearMetrics.SKIN_TEMPERATURE, rows)
-        store.prune(WearMetrics.SKIN_TEMPERATURE, System.currentTimeMillis())
+        val metric = metricFor(isSleepHolding())
+        store.putAll(metric, rows)
+        store.prune(metric, System.currentTimeMillis())
     }
 
     companion object {
@@ -85,6 +88,10 @@ internal class SkinTemperatureRecorder(
          * it inside the protocol's bounds whatever a future reader assumes.
          */
         internal const val PLACEHOLDER_AMBIENT100 = 2300
+
+        /** Where a batch of minutes goes: the synced night series in a sleep hold, the watch-only day series otherwise. */
+        internal fun metricFor(sleepHolding: Boolean) =
+            if (sleepHolding) WearMetrics.SKIN_TEMPERATURE else WearMetrics.SKIN_TEMPERATURE_DAY
 
         /** The minutes the good points fall in, each the mean of its points. Pure. */
         internal fun minutes(points: List<SkinReading>): List<WearLinkProtocol.SkinMinute> =

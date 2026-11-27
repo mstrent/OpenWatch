@@ -349,6 +349,7 @@ class WearAppService : Service(), WearGraph.Host {
         workout = graph.workout.isActive,
         recovering = graph.workout.isRecovering,
         interactive = graph.interactive,
+        skinAllDay = graph.skinAllDay,
     )
 
     /** What the debug snapshots record as the plan in force, and today's held minutes against their budget. */
