@@ -14,8 +14,13 @@ take turns at.
 - The rules below are upstream's and still hold, with two fork-specific notes:
   (1) adding a Google proprietary health API/library is **allowed here** when it
   unlocks sensors or data, so long as the no-`INTERNET` watch invariant is
-  checked; the raw-sensors-only rule below still governs anything meant to merge
-  upstream. (2) Record fork-only state in `docs/notes/` or this section, never by
+  checked. For anything meant to merge upstream, upstream's own rules govern
+  (`docs/engineering/samsung-health-and-privacy.md`, "Rules for OpenWatch"): raw
+  sensors are the *default* source and no vendor library (Samsung SDK `.aar`, Health
+  Services) is a dependency, but a vendor on-device service is acceptable as an
+  opt-in, device-gated, off-by-default source through a clean-room client, as the
+  Samsung Health Platform Binder client in `wear/.../samsung/` is. It is not a
+  raw-sensors-only rule. (2) Record fork-only state in `docs/notes/` or this section, never by
   rewriting upstream-authored docs.
 - Sensor facts and open survey questions belong in
   `docs/research/pixel-watch-sensor-map.md`.

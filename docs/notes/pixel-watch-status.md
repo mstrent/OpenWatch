@@ -72,6 +72,14 @@ data as an ordinary app can actually reach.
 - **2026-11-26 — Upstream acceptance is not a goal.** The fork keeps what upstream
   would reject (e.g. a Health Services dependency); upstream PRs are optional. The
   `AGENTS.md` fork section still says what would need dropping for a PR.
+  Upstream's rule is **not** "raw sensors only" (corrected 2026-11-27): raw sensors
+  are the default and vendor libraries stay out of the build, but upstream already
+  ships an opt-in, device-gated clean-room client to Samsung's proprietary Health
+  Platform (heart rate, IBI, SpO2, skin temperature). Upstream excluded Health
+  Services because on the Galaxy Watch it added nothing over raw sensors (it is
+  Samsung's tracker underneath) and it carries Play Services telemetry; neither
+  reason was measured on a Pixel. An opt-in, Pixel-only Health Services source would
+  have that Samsung precedent if a PR is ever attempted.
 - **2026-11-26 — Google proprietary APIs/libraries are allowed** when they unlock
   sensors or data, subject to the Workspace-only rule and the no-`INTERNET` watch
   invariant (Health Services client 1.1.0 checked: no network permissions).
@@ -293,6 +301,17 @@ Google Health. The existing Samsung paths for them stay untouched.
   permission ≠ network permission, but check what a dependency drags in).
 
 ## Session journal (newest first)
+
+### 2026-11-27 (afternoon) — Claude Code (session: distribution options + upstream rule wording)
+- Discussed distribution for the family. Upstream already publishes
+  `tech.mmarca.openwatch` on Play (README pipeline; listing page exists, its track and
+  form factors not verified). A fork listing would need its own `applicationId`; the
+  likely path is Play internal/closed testing with a family Google Group. Managed
+  Google Play private apps were judged a poor fit (no Wear OS enterprise management).
+  Merging upstream instead was raised as an option, not decided.
+- Corrected the "raw-sensors-only" wording in the `AGENTS.md` fork section and in
+  Decisions above: upstream allows opt-in vendor-service sources (its Samsung Health
+  Platform client); see `docs/engineering/samsung-health-and-privacy.md`.
 
 ### 2026-11-27 (late morning) — Claude Code (session: emulators moved to Wear OS 7 + Android 17)
 - Matt pointed out Wear OS 6+ images exist (tag `android-wear-signed`, which my search
