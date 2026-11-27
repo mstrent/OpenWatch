@@ -289,7 +289,10 @@ signed in or out.
 
 1. Health Services answers and delivers on a watch where the vendor app is signed in on a
    consumer account (verified 2026-11-26). **Still open:** does it on a Workspace-only watch, or
-   with the vendor app signed out?
+   with the vendor app signed out? (2026-11-27: on the stock Wear OS 5.1 emulator with no
+   Google account at all, Health Services delivers measured and passive HR, steps,
+   calories, distance and floors — the platform needs no account; the Pixel's
+   vendor-backed stack is still unverified.)
 2. ~~The full sensor list with permission gates~~ — **answered 2026-11-26**: heart rate is gated by
    `READ_HEART_RATE` only (on Android 17); see the verified capture above. New follow-up: what do
    `heart_rate_extended` and `step_cadence` carry in their event values?

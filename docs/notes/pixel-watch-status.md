@@ -142,6 +142,32 @@ The watch:
   com.google.android.wearable.healthservices`. Accounts (don't paste addresses into
   the repo): `adb shell dumpsys account`.
 
+Emulators (set up 2026-11-27; a functional bench, never a performance or Pixel-hub one —
+see the emulator design gate in the 2026-11-26 Lobe AI journal entry):
+
+- `sdkmanager "emulator" "system-images;android-35-ext15;android-wear;x86_64"
+  "system-images;android-36;google_apis;x86_64"` (no Wear OS 6 image is offered), then
+  `avdmanager create avd -n ow_watch -k "system-images;android-35-ext15;android-wear;x86_64"
+  -d wearos_large_round` and `-n ow_phone -k "system-images;android-36;google_apis;x86_64"
+  -d pixel_6`. Boot: `emulator -avd ow_watch -port 5554 -no-snapshot-save` and
+  `emulator -avd ow_phone -port 5556 -no-snapshot-save` → `emulator-5554` / `emulator-5556`.
+- Both images are userdebug: `adb root` works and `sqlite3` is on the watch, so the
+  watch's `databases/metrics.db` (table `rows`: `metric, time_ms, line, seq`) can be
+  seeded directly. Force-stop the app first; a tile keeps its read for 5 min, so
+  remove/add it (`am broadcast -a com.google.android.wearable.app.DEBUG_SURFACE --es
+  operation remove-tile|add-tile --ecn component <pkg>/<TileService>`) to see new data.
+  Complications: `--es operation set-complication --ecn component <provider> --ecn
+  watchface <face> --ei slot <n> --ei type 3`; Orbita (default face) has no slots, use
+  `...watchface.rwf/...utilita.UtilitaWatchFaceService` (`--es operation set-watchface`).
+- **The real link works between them**: netsim carries classic Bluetooth and RFCOMM.
+  Watch discoverable (`am start -a android.bluetooth.adapter.action.REQUEST_DISCOVERABLE`),
+  pair in phone Settings → Pair new device, phone OpenWatch → Pair a watch, then on the
+  watch OpenWatch → Settings → Phone → Allow (the notification's buttons did not take
+  emulator taps). Phone grants: `pm grant` each `android.permission.health.*` and
+  `dumpsys deviceidle whitelist +<pkg>`.
+- Limits: the watch emulator has heart rate but **no skin temperature sensor**, so the
+  watch does not announce `sk` and skin sync cannot be exercised end to end there.
+
 ## Next actions
 
 1. **After M0:** install the current watch build (`scripts/wear-install.sh`; the watch still runs
@@ -258,6 +284,28 @@ Google Health. The existing Samsung paths for them stay untouched.
   permission ≠ network permission, but check what a dependency drags in).
 
 ## Session journal (newest first)
+
+### 2026-11-27 (morning) — Claude Code (session: emulator bench)
+- Watch + phone emulators set up (commands in "Working on this"). Debug builds of both
+  apps installed; the phone paired and linked to the watch over emulated Bluetooth and
+  ran a full sync (steps, sleep, hrv, entries, workouts all answered).
+- Skin variation checked on the emulator with seeded nights: the tile showed **+0.4°**
+  with 7 bars matching a hand computation of each night's rolling baseline; the
+  complication showed "+0.4°" with the thermometer icon on Utilita; with two nights the
+  tile showed "—" and the building caption. **Bug found and fixed**: that caption was
+  ellipsized ("…set your bas…"); every metric tile's caption may now take two lines.
+  Not checkable there: the "Skin temp now" card (no skin sensor → not offered).
+- **Bug fixed in `scripts/wear-install.sh`**: under `set -o pipefail`, `adb shell … |
+  grep -q` read false when grep quit early, so a debuggable build was reported
+  "compiled (speed-profile)" and the link-service check could misreport. Both now
+  capture the output first.
+- **Account-free Health Services (evidence for open question 1, not an answer)**: on
+  the stock Wear OS 5.1 emulator with **zero Google accounts**, the probe saw Health
+  Services list its passive/measure/exercise capabilities and deliver 89 measured HR
+  points and passive HeartRate/Steps/Calories/Distance/Floors over 90 s. So Health
+  Services itself does not require any account. It does **not** show what a Pixel
+  Watch's vendor-backed Health Services does with Google Health signed out or
+  Workspace-only: that still needs the real watch.
 
 ### 2026-11-27 (late night) — Claude Code (session: skin temperature now + Google-Health-style variation)
 - Matt asked for skin temperature "right now" + graphed (for fun) and a tile/complication
