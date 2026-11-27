@@ -112,6 +112,17 @@
     <string name="tile_steps_caption">steps on this watch</string>
     <string name="tile_steps_no_sensor">no step counter</string>
     <string name="tile_floors_label">Floors</string>
+    <string name="tile_skin_label">Skin temperature</string>
+    <string name="tile_skin_description">Last night\'s skin temperature against your own baseline</string>
+    <string name="tile_skin_caption">vs your baseline</string>
+    <string name="tile_skin_spoken">%1$s against your baseline last night</string>
+    <string name="tile_skin_no_night">No reading last night</string>
+    <string name="tile_skin_week">last 7 nights</string>
+    <plurals name="tile_skin_building">
+        <item quantity="one">%d more night to set your baseline</item>
+        <item quantity="other">%d more nights to set your baseline</item>
+    </plurals>
+    <string name="complication_skin_title">skin</string>
     <string name="tile_floors_description">The floors you climbed since midnight and when you climbed them</string>
     <string name="tile_floors_caption">floors today</string>
     <string name="tile_floors_climbed">%1$s m climbed</string>

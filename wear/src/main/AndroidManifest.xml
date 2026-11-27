@@ -154,6 +154,21 @@
                 android:name="androidx.wear.tiles.PREVIEW"
                 android:resource="@drawable/tile_preview_floors" />
         </service>
+        <!-- Last night's skin temperature against the wearer's baseline, as Google Health shows it. -->
+        <service
+            android:name=".SkinTemperatureTileService"
+            android:description="@string/tile_skin_description"
+            android:exported="true"
+            android:icon="@drawable/ic_metric_skin_temperature"
+            android:label="@string/tile_skin_label"
+            android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
+            <intent-filter>
+                <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
+            </intent-filter>
+            <meta-data
+                android:name="androidx.wear.tiles.PREVIEW"
+                android:resource="@drawable/tile_preview_skin_temperature" />
+        </service>
         <!-- Today's steps and heart rate side by side; reads as the two tiles above do. -->
         <service
             android:name=".MainVitalsTileService"
@@ -235,6 +250,24 @@
             <meta-data
                 android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
                 android:value="300" />
+        </service>
+
+        <!-- Last night's skin temperature variation; changes once a night, asked again hourly. -->
+        <service
+            android:name=".SkinTemperatureComplicationService"
+            android:exported="true"
+            android:icon="@drawable/ic_metric_skin_temperature"
+            android:label="@string/tile_skin_label"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="3600" />
         </service>
 
         <!-- One instance: a tile, the watch face pill or a notification that opens the app reaches the one

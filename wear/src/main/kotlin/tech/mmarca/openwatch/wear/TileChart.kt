@@ -6,6 +6,7 @@ import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Shader
+import kotlin.math.abs
 import java.io.ByteArrayOutputStream
 
 /**
@@ -81,18 +82,51 @@ internal class TileChart(
         }
     }
 
+    /**
+     * Each night's variation as a bar from the baseline, up warmer and down cooler, the
+     * oldest night first; a night without one leaves its slot empty. The scale is
+     * symmetric, at least [MIN_DELTA_SPAN] either way, so a quiet week stays flat.
+     */
+    fun deltas(values: List<Double?>): Png? {
+        val known = values.filterNotNull()
+        if (known.isEmpty() || !fits()) return null
+        val span = maxOf(known.maxOf { abs(it) }, MIN_DELTA_SPAN)
+        val zero = (top + baseline) / 2f
+        val half = (baseline - top) / 2f
+        val slot = widthPx.toFloat() / values.size
+        val barWidth = slot * BAR_SHARE
+        return draw(day = null) { canvas ->
+            canvas.drawLine(0f, zero, widthPx.toFloat(), zero, Paint().apply {
+                color = AXIS_COLOR
+                strokeWidth = density
+            })
+            val bar = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accent }
+            values.forEachIndexed { index, value ->
+                if (value == null) return@forEachIndexed
+                val left = slot * index + (slot - barWidth) / 2f
+                // A night on the baseline still shows, as a sliver.
+                val height = maxOf((abs(value) / span).toFloat() * half, stroke / 2f)
+                val (from, to) = if (value >= 0) zero - height to zero else zero to zero + height
+                canvas.drawRoundRect(left, from, left + barWidth, to, stroke, stroke, bar)
+            }
+        }
+    }
+
     private fun fits(): Boolean = widthPx > 0 && baseline - top > stroke * 4
 
     private fun xAt(fraction: Float): Float = widthPx * fraction
 
-    private fun draw(day: TileDay, plot: (Canvas) -> Unit): Png {
+    /** A chart over [day] gets the time axis and the hour marks; one without a day draws its own frame. */
+    private fun draw(day: TileDay?, plot: (Canvas) -> Unit): Png {
         val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        canvas.drawLine(0f, baseline, widthPx.toFloat(), baseline, Paint().apply {
-            color = AXIS_COLOR
-            strokeWidth = density
-        })
-        drawHourLabels(canvas, day)
+        if (day != null) {
+            canvas.drawLine(0f, baseline, widthPx.toFloat(), baseline, Paint().apply {
+                color = AXIS_COLOR
+                strokeWidth = density
+            })
+            drawHourLabels(canvas, day)
+        }
         plot(canvas)
         val png = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.PNG, PNG_QUALITY, png)
@@ -140,6 +174,12 @@ internal class TileChart(
         const val LABEL_TEXT_DP = 10f
         const val LABEL_GAP_DP = 3f
         const val MIN_BPM_SPAN = 40f
+
+        /** °C either side of the baseline the bars' scale reaches at least. */
+        const val MIN_DELTA_SPAN = 0.5
+
+        /** A night's bar's share of its slot. */
+        const val BAR_SHARE = 0.55f
         const val FILL_ALPHA_TOP = 0x66
 
         /** PNG ignores the quality; lossless either way. */
