@@ -67,6 +67,11 @@ internal data class DayReadings(
     val night: Map<MetricTile, NightValue> = emptyMap(),
     /** The time in each heart rate zone, zone 1 first; empty for a day read without a basis for the zones. */
     val heartZoneTime: List<Duration> = emptyList(),
+    /** The day's skin temperature, quarter-hour means broken at a missing one; empty without a minute. */
+    val skinLine: List<List<LinePoint>> = emptyList(),
+    /** The mean, lowest and highest of the day's skin minutes; null without one. */
+    val skinStats: SampleStats? = null,
+    val latestSkin: SkinMinute? = null,
 )
 
 /** Turns the watch's own rows into the values the dashboard and the detail screens read. */
@@ -79,6 +84,9 @@ internal object WearReadings {
     private const val DECIMETRES_PER_METRE = 10.0
     private const val MINUTE_MILLIS = 60_000L
     private const val QUARTER_HOUR_MILLIS = 15 * MINUTE_MILLIS
+
+    /** The newest skin minute is "now" for this long; then the card shows no value. */
+    private const val SKIN_NOW_FRESH_MILLIS = 15 * MINUTE_MILLIS
 
     /**
      * How far apart two of a night's readings may be and still be joined. An
@@ -134,6 +142,14 @@ internal object WearReadings {
         endMillis = date.atTime(LocalTime.NOON).atZone(zone).toInstant().toEpochMilli(),
     )
 
+    /** Skin minutes as their chart draws them: quarter-hour means, broken at a missing quarter hour. */
+    private fun quarterHourLine(skin: List<SkinMinute>): List<List<LinePoint>> =
+        line(
+            skin.groupBy { it.epochMillis / QUARTER_HOUR_MILLIS }
+                .map { (quarter, minutes) -> quarter * QUARTER_HOUR_MILLIS to minutes.map { it.skinCelsius }.average() },
+            breakAfterMillis = QUARTER_HOUR_MILLIS,
+        )
+
     /**
      * A night's vitals from its [rows], one value a night:
      * - HRV: the mean of the positive readings as health-calculations takes a
@@ -160,11 +176,9 @@ internal object WearReadings {
         }
         val skin = rows.skin.map { it.skinCelsius }
         skin.medianOrNull()?.let { median ->
-            val byQuarterHour = rows.skin.groupBy { it.epochMillis / QUARTER_HOUR_MILLIS }
-                .map { (quarter, minutes) -> quarter * QUARTER_HOUR_MILLIS to minutes.map { it.skinCelsius }.average() }
             put(
                 MetricTile.SKIN_TEMPERATURE,
-                NightValue(median, line(byQuarterHour, breakAfterMillis = QUARTER_HOUR_MILLIS), low = skin.min(), high = skin.max()),
+                NightValue(median, quarterHourLine(rows.skin), low = skin.min(), high = skin.max()),
             )
         }
         if (rows.respiratory.isNotEmpty()) {
@@ -197,6 +211,7 @@ internal object WearReadings {
         ascent: List<AscentMinute>,
         night: NightRows = NightRows(),
         zoneBasis: HeartRateZones.Basis? = null,
+        skin: List<SkinMinute> = emptyList(),
     ): DayReadings {
         val stepsAt = steps.associate { it.epochMillis to it.steps }
         val stepsByHour = DoubleArray(HOURS)
@@ -221,6 +236,9 @@ internal object WearReadings {
             hasAscent = ascent.isNotEmpty(),
             night = night(night),
             heartZoneTime = zoneBasis?.let { timeInZones(heartRate, it) }.orEmpty(),
+            skinLine = quarterHourLine(skin),
+            skinStats = skin.takeIf { it.isNotEmpty() }?.map { it.skinCelsius }?.let { SampleStats(low = it.min(), average = it.average(), high = it.max()) },
+            latestSkin = skin.maxByOrNull { it.epochMillis },
         )
     }
 
@@ -278,6 +296,19 @@ internal object WearReadings {
                         week = days.dropWhile { it.night[metric] == null }.map { day -> day.night[metric]?.value },
                         // The headline is the night's value already: the lowest and highest reading frame it.
                         todayStats = lastNight?.let { SampleStats(low = it.low, average = null, high = it.high) },
+                    ),
+                )
+            }
+            today.latestSkin?.let { latest ->
+                put(
+                    MetricTile.SKIN_TEMPERATURE_NOW,
+                    MetricUiState(
+                        // An old minute is not "now": the card says there is no reading rather than show it.
+                        current = latest.skinCelsius.takeIf { now.toEpochMilli() - latest.epochMillis <= SKIN_NOW_FRESH_MILLIS },
+                        today = today.skinLine.flatten().map { it.value },
+                        line = today.skinLine,
+                        week = days.dropWhile { it.skinStats == null }.map { it.skinStats?.average },
+                        todayStats = today.skinStats,
                     ),
                 )
             }

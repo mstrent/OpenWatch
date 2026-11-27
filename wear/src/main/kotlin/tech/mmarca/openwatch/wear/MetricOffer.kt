@@ -36,5 +36,6 @@ internal object MetricOffer {
         if (sensors.stepCounter) addAll(listOf(MetricTile.STEPS, MetricTile.DISTANCE, MetricTile.ACTIVE_CALORIES))
         if (sensors.heartRate) add(MetricTile.HEART_RATE)
         if (sensors.barometer) addAll(listOf(MetricTile.FLOORS, MetricTile.ELEVATION))
+        if (sensors.skinSensor) add(MetricTile.SKIN_TEMPERATURE_NOW)
     }
 }

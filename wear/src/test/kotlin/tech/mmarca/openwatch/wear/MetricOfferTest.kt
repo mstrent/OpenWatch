@@ -53,4 +53,10 @@ class MetricOfferTest {
     fun `a day metric the sensor list does not show is offered once a reading of it is there`() {
         assertTrue(MetricTile.STEPS in MetricOffer.available(WatchSensors.NONE, setOf(MetricTile.STEPS)))
     }
+
+    @Test
+    fun `skin temperature now follows the raw skin sensor`() {
+        assertEquals(setOf(MetricTile.SKIN_TEMPERATURE_NOW), MetricOffer.recorded(WatchSensors.NONE.copy(skinSensor = true)))
+        assertFalse(MetricTile.SKIN_TEMPERATURE_NOW in MetricOffer.available(WatchSensors.NONE.copy(heartRate = true), emptySet()))
+    }
 }

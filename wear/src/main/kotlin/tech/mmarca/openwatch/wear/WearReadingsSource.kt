@@ -121,6 +121,9 @@ internal class WearReadingsSource(
             ascent = store.since(WearMetrics.ASCENT, from, ROW_LIMIT, until),
             night = night(WearReadings.nightWindow(date, zone)),
             zoneBasis = zoneBasis,
+            // The held night's minutes and the watch-only day's: the skin "now" and its line are both.
+            skin = (store.since(WearMetrics.SKIN_TEMPERATURE, from, ROW_LIMIT, until) +
+                store.since(WearMetrics.SKIN_TEMPERATURE_DAY, from, ROW_LIMIT, until)).sortedBy { it.epochMillis },
         )
     }
 

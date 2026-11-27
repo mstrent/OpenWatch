@@ -33,7 +33,7 @@ fun formatMetricValue(metric: MetricTile, value: Double, unitSystem: UnitSystem)
             UnitSystem.IMPERIAL -> formatCount((value * FeetPerMeter).roundToInt())
         }
         MetricTile.SLEEP -> formatHoursMinutes(value)
-        MetricTile.SKIN_TEMPERATURE -> when (unitSystem) {
+        MetricTile.SKIN_TEMPERATURE, MetricTile.SKIN_TEMPERATURE_NOW -> when (unitSystem) {
             UnitSystem.METRIC -> formatOneDecimal(value)
             UnitSystem.IMPERIAL -> formatOneDecimal(value * FahrenheitPerCelsius + FahrenheitAtZeroCelsius)
         }
@@ -79,7 +79,7 @@ fun metricUnitLabel(metric: MetricTile, unitSystem: UnitSystem): Int =
         MetricTile.RESTING_HEART_RATE -> R.string.unit_bpm
         MetricTile.HRV -> R.string.unit_ms
         MetricTile.SLEEP -> R.string.unit_hours
-        MetricTile.SKIN_TEMPERATURE -> when (unitSystem) {
+        MetricTile.SKIN_TEMPERATURE, MetricTile.SKIN_TEMPERATURE_NOW -> when (unitSystem) {
             UnitSystem.METRIC -> R.string.unit_celsius
             UnitSystem.IMPERIAL -> R.string.unit_fahrenheit
         }

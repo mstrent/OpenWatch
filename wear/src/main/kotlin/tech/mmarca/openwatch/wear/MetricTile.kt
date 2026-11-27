@@ -153,6 +153,14 @@ enum class MetricTile(
         period = MetricPeriod.NIGHT,
     ),
 
+    /** Degrees Celsius at the wrist now, and through the day: Pixel's raw sensor, recorded all day. Never renamed. */
+    SKIN_TEMPERATURE_NOW(
+        R.string.metric_skin_temperature_now,
+        Icons.Outlined.Thermostat,
+        SkinTemperatureColor,
+        MetricKind.SAMPLED,
+    ),
+
     /** Breaths per minute, from the night HRV windows. */
     RESPIRATORY_RATE(
         R.string.metric_respiratory_rate,

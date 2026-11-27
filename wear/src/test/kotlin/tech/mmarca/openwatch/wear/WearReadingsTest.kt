@@ -40,7 +40,8 @@ class WearReadingsTest {
         ascent: List<AscentMinute> = emptyList(),
         zoneBasis: HeartRateZones.Basis? = null,
         night: NightRows = NightRows(),
-    ) = WearReadings.day(date, zone, heartRate, steps, ascent, night, zoneBasis)
+        skin: List<SkinMinute> = emptyList(),
+    ) = WearReadings.day(date, zone, heartRate, steps, ascent, night, zoneBasis, skin)
 
     private fun heartRateOf(samples: List<HeartRateSample>, zoneBasis: HeartRateZones.Basis? = null): MetricUiState =
         WearReadings.metrics(week(day(today, heartRate = samples, zoneBasis = zoneBasis)), now, zone).getValue(MetricTile.HEART_RATE)
@@ -591,5 +592,24 @@ class WearReadingsTest {
         for (tile in listOf(MetricTile.SLEEP, MetricTile.RESTING_HEART_RATE, MetricTile.ACTIVE_CALORIES, MetricTile.DISTANCE)) {
             assertFalse(tile.name, tile in metrics)
         }
+    }
+
+    @Test
+    fun `skin temperature now is the newest minute while it is fresh, with the day's line`() {
+        // now is 10:30: a minute at 10:20 is fresh, the line has both quarter hours.
+        val skin = listOf(SkinMinute(at(today, 9, 0), 3300, 2300), SkinMinute(at(today, 10, 20), 3350, 2300))
+        val state = WearReadings.metrics(week(day(today, skin = skin)), now, zone).getValue(MetricTile.SKIN_TEMPERATURE_NOW)
+        assertEquals(33.5, state.current!!, 1e-9)
+        assertEquals(listOf(33.0, 33.5), state.today)
+        assertEquals(33.0, state.todayStats!!.low, 1e-9)
+        assertEquals(33.5, state.todayStats!!.high, 1e-9)
+    }
+
+    @Test
+    fun `skin temperature now shows no value once the newest minute is over fifteen minutes old`() {
+        val skin = listOf(SkinMinute(at(today, 10, 14), 3300, 2300))
+        val state = WearReadings.metrics(week(day(today, skin = skin)), now, zone).getValue(MetricTile.SKIN_TEMPERATURE_NOW)
+        assertNull(state.current)
+        assertEquals(listOf(33.0), state.today)
     }
 }

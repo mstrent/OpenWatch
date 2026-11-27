@@ -24,6 +24,8 @@ data class WatchSensors(
      * red and infrared light are closed to ordinary apps.
      */
     val spo2: Boolean = false,
+    /** Pixel's raw skin sensor (`com.google.sensor.skin_temperature`): skin temperature all day, so a "now". */
+    val skinSensor: Boolean = false,
 ) {
     /** The spot measurements a wearer can start on this watch. */
     val spotKinds: Set<SpotKind>
@@ -36,7 +38,7 @@ data class WatchSensors(
 
     companion object {
         /** A watch with every sensor, for a test or a preview. */
-        val ALL = WatchSensors(heartRate = true, heartBeat = true, rawPpg = true, stepCounter = true, barometer = true, gps = true, spo2 = true)
+        val ALL = WatchSensors(heartRate = true, heartBeat = true, rawPpg = true, stepCounter = true, barometer = true, gps = true, spo2 = true, skinSensor = true)
 
         /** A watch with none. */
         val NONE = WatchSensors(heartRate = false, heartBeat = false, rawPpg = false, stepCounter = false, barometer = false, gps = false)

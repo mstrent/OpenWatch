@@ -246,6 +246,7 @@
     <string name="summary_duration">Duration</string>
     <string name="summary_average_heart_rate">Avg heart rate</string>
     <string name="metric_skin_temperature">Skin temperature</string>
+    <string name="metric_skin_temperature_now">Skin temp now</string>
     <string name="metric_respiratory_rate">Breathing rate</string>
     <string name="unit_celsius">°C</string>
     <string name="unit_fahrenheit">°F</string>

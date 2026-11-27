@@ -49,7 +49,8 @@ class WearTilePreferencesTest {
         assertEquals(
             listOf(
                 "STEPS", "HEART_RATE", "DISTANCE", "ACTIVE_CALORIES", "FLOORS", "ELEVATION", "BLOOD_OXYGEN", "VO2_MAX",
-                "RESTING_HEART_RATE", "HRV", "SLEEP", "HYDRATION", "SKIN_TEMPERATURE", "RESPIRATORY_RATE", "WEIGHT",
+                "RESTING_HEART_RATE", "HRV", "SLEEP", "HYDRATION", "SKIN_TEMPERATURE", "SKIN_TEMPERATURE_NOW",
+                "RESPIRATORY_RATE", "WEIGHT",
             ),
             MetricTile.entries.map { it.name },
         )

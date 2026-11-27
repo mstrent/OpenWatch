@@ -224,6 +224,7 @@ internal class WearGraph(private val app: Application) {
             barometer = AscentRecorder.hasBarometer(app),
             gps = app.packageManager.hasSystemFeature(PackageManager.FEATURE_LOCATION_GPS),
             spo2 = spotSpo2Source.isAvailable,
+            skinSensor = skinAllDay,
         )
     }
 

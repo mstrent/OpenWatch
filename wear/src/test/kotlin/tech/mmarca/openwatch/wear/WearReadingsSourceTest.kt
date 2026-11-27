@@ -340,4 +340,15 @@ class WearReadingsSourceTest {
         val BERLIN: ZoneId = ZoneId.of("Europe/Berlin")
         const val TIMEOUT_MILLIS = 10_000L
     }
+
+    @Test
+    fun `skin temperature now reads the held night's minutes and the day's together`() {
+        store.putAll(WearMetrics.SKIN_TEMPERATURE, listOf(SkinMinute(at("06:00:00"), 3300, 2300)))
+        store.putAll(WearMetrics.SKIN_TEMPERATURE_DAY, listOf(SkinMinute(at("10:25:00"), 3400, 2300)))
+
+        val state = source.load().getValue(MetricTile.SKIN_TEMPERATURE_NOW)
+
+        assertEquals(34.0, state.current!!, 1e-9)
+        assertEquals(listOf(33.0, 34.0), state.today)
+    }
 }
