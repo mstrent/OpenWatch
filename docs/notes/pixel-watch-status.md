@@ -160,6 +160,37 @@ The watch:
 4. Before any push of code: `./gradlew verifyCi verifyWearCi` and
    `python3 scripts/sync-wiki.py --repo mstrent/OpenWatch --check`. (`verifyWearCi`
    passed on 2026-11-26 with the probe in the debug source set.)
+5. **Dashboard jank (from the 2026-11-26 jank session; nothing attributed yet).**
+   Housekeeping first: the watch's `screen_off_timeout` is still `600000` — restore it
+   to `10000` when jank work pauses.
+   1. Make `scripts/wear-jank-capture.sh` wake the watch and raise `screen_off_timeout`
+      itself; interim external workaround:
+      `adb -s <serial> shell settings put system screen_off_timeout 600000 && adb -s
+      <serial> shell input keyevent 224`
+   2. Compose compiler stability/metrics dump for `:wear` (no device needed) to test
+      whether `WearUiState` and the tile/metric models are unstable and force
+      recomposition.
+   3. Trace attribution of `reports/jank/trace.pb` in https://ui.perfetto.dev or a local
+      trace processor — resolve pids 11391/684 and correlate jank against `query`,
+      `generateTokenForPredictions`, `TextureOp`, `FillRectOp`, `FillRRectOp`,
+      `CircleOp`, `ScopedCodeCacheWrite`, `Compiling baseline`, plus the
+      VSync/surfaceflinger and input/window/scheduler tracks. Opening the trace
+      externally needs Matt's approval (it contains package/process/slice data);
+      installing a local trace processor is a download that also needs his approval.
+   4. debug vs non-debuggable-debug A/B on the watch:
+      `scripts/wear-jank-capture.sh -s <serial> -p tech.mmarca.openwatch.debug -r 5
+      -o reports/jank-debug`
+      `OPENWATCH_PUBLISHED_DEBUG_APK=true ./gradlew :wear:assembleDebug` (then install
+      and re-run the same harness). Interpretation: clean scroll on non-debuggable debug
+      means debug-only costs dominate; persistent jank means look at code paths before
+      UI micro-optimization. This does NOT isolate R8.
+   5. Crown/rotary baseline — still needed, no scripted method exists yet.
+   6. Deferred `:wear:benchmark` Macrobenchmark module, only after rungs 1-3 localize
+      the problem. Expected changes: `settings.gradle.kts` include,
+      `androidx.benchmark.macro.junit4`, uiautomator, a `benchmark` build type with
+      debug signing locally but `isDebuggable = false` and `isMinifyEnabled = true`,
+      lockfile/`gradle/verification-metadata.xml` updates. It must not alter shipped
+      `debug`/`ci`/`release`/`nightly` behaviour or default install scripts.
 
 ## Development plan (if we start now, from what we know/assume)
 
@@ -247,6 +278,117 @@ Google Health. The existing Samsung paths for them stay untouched.
   permission ≠ network permission, but check what a dependency drags in).
 
 ## Session journal (newest first)
+
+### 2026-11-26 — Lobe AI / pair-programmer (session: dashboard jank baseline captured on Pixel Watch 5)
+- **Emulator design gate:** an emulator is valid ONLY as a *relative* comparator — same
+  host/AVD/variant, quiesced host, animations off, repeated interleaved runs, compare
+  medians/p99 — never means or single runs. It cannot be trusted for absolute ms, Pixel
+  Watch GPU behaviour, thermal throttling, vsync cadence, crown/rotary latency, real
+  Health Connect/sensor load, or low-RAM pressure. No emulator or system image was
+  installed; the real watch superseded that plan.
+- **Accepted measurement ladder:** Rung 1 `dumpsys gfxinfo <pkg> framestats` + Perfetto
+  on the real watch (primary, zero new code); Rung 2 Compose compiler stability/metrics
+  dump; Rung 3 real Pixel Watch 5 over adb (authoritative absolute); Rung 4
+  `:wear:benchmark` Macrobenchmark module (right end-state, deferred).
+- **Harness:** `scripts/wear-jank-capture.sh` (committed in `a994bad`). Baseline command:
+  `scripts/wear-jank-capture.sh -s "adb-68181WRDTL51TA-sO3EOB._adb-tls-connect._tcp"
+  -p tech.mmarca.openwatch.debug -r 5 -o reports/jank`
+- **Devices attached during capture (both at once, so every adb call needs
+  `-s <serial>` or `ANDROID_SERIAL`):** phone `adb-5A160DLCH00311-IatGql._adb-tls-connect._tcp`
+  model `Pixel_10_Pro` (`blazer`); watch `adb-68181WRDTL51TA-sO3EOB._adb-tls-connect._tcp`
+  model `Pixel_Watch_5` (`wisteria_lte`). Watch display 480x480, density 320,
+  vsync 60.000004 Hz, `presentationDeadlineNanos=16000000`, supportedRefreshRates
+  [60.000004, 30.000002, 20.0].
+- **First run INVALID:** 4 of 5 runs reported `Total frames rendered: 0`. Root cause:
+  `mWakefulness=Dozing`, so gfxinfo recorded no frames. Fix: wake with `input keyevent
+  224` and raise `screen_off_timeout` from its original `10000` to `600000` (600000 is
+  still set on the watch as of this writing — restore it to 10000 when jank work ends).
+- **Valid baseline, 5 runs.** Jank artifacts under the gitignored `reports/jank/`
+  (`.gitignore:47` ignores `reports/`; artifacts are local-only, NOT committed):
+
+  | run | frames | janky | janky% | p90ms | p95ms | p99ms |
+  |---:|---:|---:|---:|---:|---:|---:|
+  | 1 | 67 | 31 | 46.27 | 300 | 300 | 400 |
+  | 2 | 45 | 30 | 66.67 | 350 | 400 | 400 |
+  | 3 | 47 | 31 | 65.96 | 300 | 350 | 400 |
+  | 4 | 63 | 29 | 46.03 | 300 | 350 | 400 |
+  | 5 | 56 | 36 | 64.29 | 300 | 350 | 400 |
+
+  Median janky frames across runs: 31. Run 2 detail: Janky frames 30 (66.67%), legacy 38
+  (84.44%), 50th 150ms, 90th 350ms, 95th 400ms, 99th 400ms, Missed Vsync 21, High input
+  latency 27, Slow UI thread 30, Slow bitmap uploads 0, Slow issue draw commands 15,
+  Frame deadline missed 30. Across runs: Missed Vsync 21-25, High input latency 14-72,
+  Slow UI thread 29-36, Slow bitmap uploads 0, Slow issue draw commands 11-15, Frame
+  deadline missed == janky count.
+- **GPU summary caveat:** run 2's GPU percentiles read 8ms (50th) and 4950ms
+  (90th/95th/99th) with `GPU HISTOGRAM: ... 4950ms=8`. Treat the 4950ms bucket as a
+  sentinel/invalid bucket, not real GPU cost.
+- **Parser caveat:** framestats row parsing returned 0 rows while the summary counters
+  parsed fine, so there is NO per-frame stage breakdown yet. Do not claim one.
+- **Artifacts on disk:** `reports/jank/run-{1..5}-framestats.txt`,
+  `reports/jank/run-{1..5}-summary.txt`, `reports/jank/trace.pb` (5,380,596 bytes).
+- **Trace inspected only by string-pool grep:** the Python `perfetto` module is not
+  installed and no `trace_processor`/`trace_processor_shell` is on PATH. Frequent
+  slices observed: `E|684` 15885, `E|11391` 14660, `B|11391|query` 1661,
+  `B|684|generateTokenForPredictions` 1400, `B|11391|TextureOp` 988,
+  `B|11391|FillRectOp` 844, `B|11391|ScopedCodeCacheWrite` 836,
+  `B|684|renderRate 60.00 Hz` 818, `B|684|nextAnticipatedVSyncTimeFrom` 806,
+  `B|11391|FillRRectOp` 414, `B|11391|Compiling baseline` 410, `B|11391|CircleOp` 326.
+  Pid attribution for 11391 and 684 is UNRESOLVED — one looks app-side, one looks
+  surfaceflinger/system-side, not confirmed.
+- **Negative source searches** (recorded so nobody re-runs them):
+  `generateTokenForPredictions`, Integrity and Fido callers are absent from repo source;
+  a Wear-source HealthConnect REST call-site grep returned 0 hits. Whole-repo
+  HealthConnect files are:
+  `app/src/androidTest/kotlin/tech/mmarca/openwatch/healthconnect/ClientRecordVersionTest.kt`,
+  `core/health/src/main/kotlin/tech/mmarca/openwatch/healthconnect/{HealthConnectAvailabilityService.kt,
+  HealthConnectGateway.kt, SyncRecordsReader.kt}`,
+  `core/health/src/test/kotlin/tech/mmarca/openwatch/healthconnect/{ActivityRecordWriterTest.kt,
+  InsertInChunksTest.kt}`. Wear also carries a debug-only
+  `debugImplementation(libs.health.services.client)`.
+- **The observed jank is NOT yet attributed.** Do not blame Compose,
+  `TransformingLazyColumn`/`SurfaceTransformation`, ActivityRings, MetricTile, the
+  `WearUiState` combine, the step recorder, or Health Services without frame attribution
+  from the trace.
+- **Unmeasured:** scripted swipe exercises only the touch scroll/draw pipeline.
+  Crown/rotary latency and detent behaviour are still unmeasured; no crown baseline
+  exists.
+- **Harness gap:** `grep -c -iE 'keyevent|screen_off_timeout|wakefulness'
+  scripts/wear-jank-capture.sh` returned 0 — the script does not wake the watch or
+  extend screen-off timeout, so every automated run needs external wake/timeout until
+  fixed.
+- **Debug-only cost suspects** (active in `debug`, and in `ci` because `ci` is
+  `initWith(debug)` and stays debuggable, so `ci` is not a debug/release discriminator):
+  DebugProtocol JSONL I/O, Compose debug tooling / recomposition tracking, debug JIT
+  warmup, no release log stripping. `debugImplementation(libs.health.services.client)`
+  + `HealthProbeActivity` is the least plausible since the probe is opt-in via `--probe`.
+- **Code/perf hot-path candidates from the earlier audit (candidates only, no
+  attribution):** `WearAppViewModel.kt` builds one large `WearUiState` via
+  `combine(readings.metrics(...), readings.entries(), sensors, chosen tiles+quickLog
+  over Dispatchers.IO, settings)` then `.stateIn(..., WhileSubscribed(StopTimeoutMillis),
+  WearUiState())`; `WearReadingsSource.kt` constants DAYS = 7,
+  REFRESH_MILLIS = 30_000L, MIN_REFRESH_MILLIS = 2_000L,
+  ROW_LIMIT = TileDay.MAX_HEART_RATE_SAMPLES_PER_DAY, ENTRY_LIMIT = 10_000; the
+  dashboard uses `rememberTransformingLazyColumnState()` / `rememberTransformationSpec()`
+  with `transformedHeight(...)` + `SurfaceTransformation(...)` applied to ListHeader and
+  every MetricTile; `ActivityRings.kt` renders up to three nested
+  `CircularProgressIndicator` rings with overflow; `MainActivity.kt` onResume/onPause
+  call `graph.setInteractive(true/false)` which posts a host `replan()`, and
+  `RecorderPlan.kt` has `stepsLive = steps && inputs.interactive && !active` with
+  `StepRecorder.kt` using sensor latency 0 when live and MAX_REPORT_LATENCY_MICROS
+  otherwise — i.e. entering/leaving the dashboard changes recorder behaviour.
+- **Toolchain:** `gradle/gradle-daemon-jvm.properties` pins `toolchainVersion=17`; the
+  Gradle launcher JVM has been observed as Java 25.0.5 while the daemon resolves 17 —
+  the launcher mismatch is cosmetic, but benchmark/trace comparisons must preserve CI's
+  JDK-17 discipline and echo the resolved version as evidence.
+- **Invariant to preserve:** the watch merged debug manifest must NOT contain
+  `INTERNET`, `ACCESS_NETWORK_STATE`, or `ACCESS_WIFI_STATE`; the manifest grep gate
+  must stay green for any future change.
+- **No committed code change** came out of this session; the checkout is clean at
+  `bcc6663` before this docs commit. **Process lesson:** two earlier agent attempts
+  timed out with zero artifacts because of oversized scope plus Gradle lock contention —
+  future agent work must be scoped smaller, commit-per-deliverable, and serialize
+  Gradle with `./gradlew --stop` before benchmark/build runs.
 
 ### 2026-11-26 (evening) — Claude Code (session: M0 + day-of-wear report)
 - Paired the phone over Wireless debugging (Pixel 10 Pro, API 37), `./gradlew :app:assembleDebug`
