@@ -238,12 +238,21 @@ internal class WearSettingsState(private val context: Context) {
 
     val state: StateFlow<WatchPreferences> = flow.asStateFlow()
 
-    // SharedPreferences keeps its listeners weakly: this field holds this one. Called on the main thread.
+    // Called on the main thread.
     private val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> flow.value = WearSettings.read(context) }
 
     init {
+        // SharedPreferences keeps its listeners weakly, and a holder may keep only [state] (as
+        // WearGraph does), so this instance and its listener were collected and the settings
+        // stopped following writes (Pixel Watch 5, 2026-11-27). Held for the process instead.
+        synchronized(LIVE) { LIVE += listener }
         WearSettings.prefs(context).registerOnSharedPreferenceChangeListener(listener)
         // A write between the first read and the registration is not missed.
         flow.value = WearSettings.read(context)
+    }
+
+    private companion object {
+        /** The listeners of every state built: one per process in the app, a few in tests. */
+        val LIVE = mutableListOf<SharedPreferences.OnSharedPreferenceChangeListener>()
     }
 }

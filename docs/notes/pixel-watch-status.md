@@ -302,6 +302,24 @@ Google Health. The existing Samsung paths for them stay untouched.
 
 ## Session journal (newest first)
 
+### 2026-11-27 (afternoon) — Claude Code (session: settings listener bug; vitals blockers mapped)
+- **Bug fixed**: `WearGraph.settings` kept only `WearSettingsState(app).state`; SharedPreferences
+  holds listeners weakly, so after a GC the watch's settings screen (and anything reading the
+  flow) stopped following writes. Symptom: "Skin temperature" toggle stored `true` but the row
+  stayed "off". Regression test `WearSettingsTest` (GC with only the flow held). Verified on
+  the watch: recorder registers the skin sensor, `skd` rows land, "Skin temp now" card shows
+  91.1 °F. Not yet re-verified by tapping the toggle (adb taps on the dashboard's Settings
+  button did not navigate; left for Matt).
+- **Vitals blockers on Pixel Watch 5** (dumpsys): Health Services' table comes from the vendor
+  HAL ("Platform: OWL", SystemService v8); passive = 6 public types + sleep/abnormal-HR + 11
+  private ids 65537–65549. Private ids need `OEM_OPAQUE_DATA_ACCESS` (signature|privileged);
+  Fitbit and "Connected fitness" (pixel.aspen) are PRIVILEGED system apps. Raw PPG/ECG/GSR need
+  `READ_PRIVATE_SENSORS` (signature|privileged). Fitbit complications: no vitals (Readiness only).
+  Watch Health Connect empty. Open options put to Matt: phone Health Connect via Google Health
+  (consumer account), root/priv-app + decode private bytes, or disable-Fitbit exclusivity test.
+- **Watch left on the debuggable build** (janky); reinstall the fast build with
+  `OPENWATCH_PUBLISHED_DEBUG_APK=true ./gradlew :wear:assembleDebug` + `scripts/wear-install.sh`.
+
 ### 2026-11-27 (midday) — Claude Code (session: Wear OS 7 vitals through Health Services)
 - Matt wants HRV, respiratory rate, skin temperature, SpO2, VO2 max and blood pressure.
   The probe now subscribes to **every type Health Services lists** (passive) and every listed

@@ -122,9 +122,27 @@ class WearSettingsTest {
         assertTrue(settings.state.value.spo2AtNight)
     }
 
+    @Test
+    fun `the state keeps following writes when only the flow is held, as the graph holds it`() {
+        // WearGraph keeps `WearSettingsState(app).state`, not the instance; SharedPreferences
+        // keeps its listeners weakly. On a Pixel Watch 5 (2026-11-27) the skin setting was
+        // stored but the screen and the service never saw it once the listener was collected.
+        val state = WearSettingsState(context).state
+        repeat(GC_ROUNDS) { System.gc(); System.runFinalization() }
+
+        WearSettings.setSkinTemperature(context, true)
+        shadowOf(Looper.getMainLooper()).idle()
+
+        assertTrue(state.value.skinTemperature)
+    }
+
     private fun addHeartRateSensor(wakeUp: Boolean) {
         val sensor = ShadowSensor.newInstance(Sensor.TYPE_HEART_RATE)
         shadowOf(sensor).setWakeUpFlag(wakeUp)
         shadowOf(context.getSystemService(SensorManager::class.java)).addSensor(sensor)
+    }
+
+    private companion object {
+        const val GC_ROUNDS = 5
     }
 }
