@@ -27,8 +27,9 @@ data as an ordinary app can actually reach.
 - **M0 done 2026-11-26: the minimum bar works end to end.** Debug phone app on Matt's
   Pixel 10 Pro, watch linked (companion association + Validate), 30-min auto-sync and
   manual sync both run; **heart rate and steps are in Health Connect under "OpenWatch"**
-  (checked in Health Connect's own Data and access screens). Tiles/complications (Q7) are
-  still to be tried on the wrist.
+  (checked in Health Connect's own Data and access screens). On the watch, the heart rate
+  and steps complications work on the stock face and the tiles are listed (Q7).
+  **The goal's minimum bar is met on Matt's setup.**
 - Survey steps 1–4 **done** on Matt's Pixel Watch 5. Day of wear (12.6 h): `hub-40s`
   batches arrive (Q3), **no heart rate freeze beside the stock stack** (Q4), doze drain
   2.24 %/h; accelerometer only ~60 % whole in doze (new follow-up, matters for sleep).
@@ -143,8 +144,7 @@ The watch:
 
 ## Next actions
 
-1. **M0 leftovers:** add OpenWatch's tiles and a complication on the stock Pixel face
-   (Q7); install the current watch build (`scripts/wear-install.sh`; the watch still runs
+1. **After M0:** install the current watch build (`scripts/wear-install.sh`; the watch still runs
    the 09:22 pre-M1 build) and do the M1 bench check — skin rows after a night, and the
    phone's skin toggle appearing. Strava/Zepp: Strava only reads workouts from Health
    Connect, so nothing to see until a workout is recorded; Zepp not checked.
@@ -166,7 +166,7 @@ The watch:
 Ordered by value and by how little it depends on open questions. Assumptions are
 flagged; each milestone ends with an on-watch check, a status-doc update and a push.
 
-**M0 — End-to-end baseline, no code (½ day).** **Done 2026-11-26** except Q7 (see
+**M0 — End-to-end baseline, no code (½ day).** **Done 2026-11-26**, Q7 included (see
 Status). Originally: assumes the existing raw paths just work
 on Pixel, which the survey so far supports. Pair Matt's Pixel phone with the debug phone
 app (`./gradlew :app:installDebug`, the watch app is the debug build already), add the
@@ -263,6 +263,8 @@ Google Health. The existing Samsung paths for them stay untouched.
   hrv/breathing/spo2 0, then zones/profile/days sent to the watch.
 - Day-of-wear report pulled to the scratchpad (personal data, not committed); findings in the
   research doc's "a day of wear" section; Q3 and Q4 answered.
+- Matt confirmed on the wrist: the heart rate and steps complications work on the stock face,
+  and the tiles appear in the tile list (Q7). M0 complete.
 - Tip: set the phone not to lock (Matt did) or every screenshot/uiautomator dump comes back black.
 
 ### 2026-11-26 — Lobe AI / pair-programmer (session: phone-side parity follow-up)

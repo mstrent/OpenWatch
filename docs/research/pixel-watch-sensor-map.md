@@ -303,9 +303,11 @@ signed in or out.
 6. ~~Which Health Services data types does a Pixel Watch 5 list?~~ — **answered 2026-11-26**:
    see the two verified Health Services sections above; calories, distance and floors appear,
    the vitals do not.
-7. Do the stock face editor's complication slots list OpenWatch's three providers, and do all
-   their slot types (short text, ranged value) render? And do the five tiles still appear in the
-   tile list on Wear OS 7, alongside the new Wear Widgets?
+7. ~~Do the stock face's complication slots take OpenWatch's providers, and do the tiles
+   appear?~~ — **answered 2026-11-26 (Matt, on the wrist): yes.** The heart rate and steps
+   complications work on the stock Pixel face, and OpenWatch's tiles are in the tile list.
+   Not checked one by one: the third provider and every slot type (short text, ranged
+   value).
 8. Samsung's bedtime mode has no Pixel equivalent. Does the Pixel's own bedtime/sleep mode, or
    Do Not Disturb, keep the accelerometer whole enough at night for the sleep estimate to find the
    night, the way the Galaxy section of this map had to learn it did not?
