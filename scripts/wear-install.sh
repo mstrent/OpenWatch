@@ -105,14 +105,18 @@ compile_app() {
     # profile, then compile against it now, the AndroidX ProfileInstaller recipe.
     # A debuggable build cannot be compiled (ART keeps it interpreted, ~45-65% janky),
     # so smoothness is never judged on one.
-    if shell dumpsys package "$PACKAGE" | grep -q 'pkgFlags=.*DEBUGGABLE'; then
+    # Read the flags whole first: under pipefail, `grep -q` quitting early kills the adb
+    # pipe and the test reads false, so a debuggable build was "compiled" (2026-11-27).
+    local flags
+    flags=$(shell dumpsys package "$PACKAGE" | grep pkgFlags || true)
+    if [[ "$flags" == *DEBUGGABLE* ]]; then
         warn "debuggable build: ART runs it interpreted, so scrolling is janky by design. Judge smoothness on --release or an OPENWATCH_PUBLISHED_DEBUG_APK=true build."
         return
     fi
     shell am broadcast -a androidx.profileinstaller.action.INSTALL_PROFILE \
         -n "$PACKAGE/androidx.profileinstaller.ProfileInstallReceiver" >/dev/null 2>&1 || true
     sleep 1
-    if shell cmd package compile -f -m speed-profile "$PACKAGE" | grep -q Success; then
+    if [[ "$(shell cmd package compile -f -m speed-profile "$PACKAGE")" == *Success* ]]; then
         note "compiled (speed-profile): smooth from the first launch"
     else
         warn "could not compile; the app runs JIT-only until the watch's overnight dexopt"
@@ -141,7 +145,7 @@ status() {
             note "missing: $permission"
         fi
     done
-    if shell dumpsys activity services "$PACKAGE" | grep -q "$SERVICE_CLASS"; then
+    if [[ "$(shell dumpsys activity services "$PACKAGE")" == *"$SERVICE_CLASS"* ]]; then
         note "phone link service: running"
     else
         note "phone link service: not running (open the app on the watch and grant Nearby devices)"
