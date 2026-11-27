@@ -318,8 +318,15 @@ Google Health. The existing Samsung paths for them stay untouched.
   DataProto$Value$DoubleArray → double[]` in `DataType.toProtoFromValue`), before our callback.
   The probe skips non-HR measure types unless `--ez measureAll true`.
 - The permissions are declared in `wear/src/debug/AndroidManifest.xml` only (probe use).
-- **Next: the same probe on the real Pixel Watch 5.** On 2026-11-26 it listed none of these;
-  the question now is whether that holds on its current firmware with the permissions held.
+- **Real Pixel Watch 5 (firmware `CP3A.260905.002`, permissions held): still closed.** It
+  lists only HR/steps/distance/calories/floors/elevation (passive) and HR (measure); exercise
+  adds running dynamics but no vitals. Asking for the vitals by name (`--ez tryUnlisted
+  true`) is refused: `HealthServicesException: Requested data type … Heart Rate Variability
+  (RMSSD) … not supported by device passive monitoring capabilities`. The watch's own Health
+  Connect holds nothing: every connected app shows "Contributed Data: false" and Fitbit is not
+  connected to it. **Conclusion: on the Pixel, HRV/respiratory rate/SpO2/VO2 max/BP reach no
+  third-party app today** — only Google's private pipeline. Skin temperature stays open via
+  the raw sensor (built). Re-run the probe after each watch firmware update.
 
 ### 2026-11-27 (afternoon) — Claude Code (session: distribution options + upstream rule wording)
 - Discussed distribution for the family. Upstream already publishes

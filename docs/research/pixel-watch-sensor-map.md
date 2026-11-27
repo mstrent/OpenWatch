@@ -148,7 +148,12 @@ type ("MetricsMappings", 97 of them), not yet an app's `CapabilitiesClient` answ
 - **Exercise types (96 kinds):** heart rate and its stats, calories, active duration, distance,
   steps, speed/pace, cadence, elevation, floors, location/GNSS, auto-pause/stop, swim laps, and for
   running the running dynamics (stride length, ground contact time, vertical oscillation/ratio).
-- **No public type for SpO2, HRV, respiratory rate, skin temperature, stress or VO2 max.** The
+- **No public type for SpO2, HRV, respiratory rate, skin temperature, stress or VO2 max.**
+  Re-verified 2026-11-27 on firmware `CP3A.260905.002` with the Android 17 permissions
+  (`health.READ_HEART_RATE_VARIABILITY`, `_RESPIRATORY_RATE`, `_VO2_MAX`, `_BLOOD_PRESSURE`)
+  held: not listed, and refused by name ("not supported by device passive monitoring
+  capabilities"). Wear OS 7's Health Services *does* define them — the 7.0 emulator lists
+  and delivers all of them to an ordinary app — so this is the Pixel's choice. The
   earlier claim in this doc that Health Services offers them "where a device supports it" does not
   hold for this watch.
 - **Numeric types** (`65537`–`65549` passive, `131073`–`131078` per exercise) appear with no public

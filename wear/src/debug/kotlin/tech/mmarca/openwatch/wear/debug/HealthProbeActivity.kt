@@ -191,14 +191,27 @@ class HealthProbeActivity : ComponentActivity() {
             client.passiveMonitoringClient.setPassiveListenerCallback(config, callback)
             return callback
         }
-        return runCatching {
-            register("private", public + private) {
-                lifecycleScope.launch { runCatching { register("public", public) {} } }
+        // `--ez tryUnlisted true`: also ask, by name, for the vitals the Wear OS 7 emulator lists,
+        // where this device does not list them (a Pixel Watch 5, 2026-11-27).
+        val unlisted: Set<DataType<*, *>> = if (intent.getBooleanExtra("tryUnlisted", false)) {
+            VITALS.filter { name -> listed.none { it.name == name } }
+                .map { DeltaDataType(it, DataType.TimeType.SAMPLE, Double::class.javaObjectType) }.toSet()
+        } else {
+            emptySet()
+        }
+        val fallback: () -> Unit = {
+            lifecycleScope.launch {
+                runCatching {
+                    if (unlisted.isEmpty()) register("public", public) {}
+                    else register("unlisted", public + unlisted) { lifecycleScope.launch { runCatching { register("public", public) {} } } }
+                }
             }
-        }.onFailure { e ->
-            emit("passive.private.error") { put("error", e.toString()) }
-            runCatching { register("public", public) {} }
-        }.getOrNull().also { emit("passive.window") { put("seconds", seconds) } }
+        }
+        return runCatching { register("private", public + private) { fallback() } }
+            .onFailure { e ->
+                emit("passive.private.error") { put("error", e.toString()) }
+                fallback()
+            }.getOrNull().also { emit("passive.window") { put("seconds", seconds) } }
     }
 
     /** Listens to the vendor sensors behind public grants; returns the stop action. */
@@ -274,6 +287,11 @@ class HealthProbeActivity : ComponentActivity() {
 
     private companion object {
         /** The passive types the vendor app subscribes to (dumpsys, 2026-11-26), plus the others the hub lists. */
+        /** The vitals' type names as the Wear OS 7.0 emulator's Health Services lists them. */
+        val VITALS = listOf(
+            "Heart Rate Variability (RMSSD)", "Heart Rate Variability (SDNN)", "Heart Rate Variability (PNN50)",
+            "Respiratory Rate", "Skin Temperature", "SpO2", "VO2 Max",
+        )
         val PRIVATE_IDS = listOf(65537, 65538, 65539, 65540, 65541, 65542, 65543, 65545, 65547, 65548, 65549)
         const val MAX_EVENTS_LOGGED = 40
         const val MAX_POINTS_LOGGED = 20
