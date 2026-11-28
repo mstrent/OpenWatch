@@ -1,6 +1,8 @@
 # All-day calories and distance (M4)
 
-Status: proposed 2026-11-27, awaiting Matt's approval. Fork-only (`pixel-watch-support`).
+Status: proposed 2026-11-27, revised the same day to approach B (OpenWatch's own estimate
+everywhere); awaiting Matt's approval. Built on `pixel-watch-support`; upstream-compatible in
+spirit (raw sensors + own math, no vendor library).
 
 ## Intent
 
@@ -27,10 +29,13 @@ Health without any setting (Matt: "ideally it'd coexist without needing toggles"
   empty because nothing writes all-day distance.
 - **Complications** exist for heart rate, steps, floors, skin temperature; none for calories or
   distance.
-- **Health Services** on Pixel Watch 5, Workspace-only, delivers passive `Calories`/`Distance`
-  deltas and `Daily Calories`/`Daily Distance` totals to an ordinary app (probe
-  `reports/probe-20261127-172506.jsonl`). Its calories are **total** (a resting minute was
-  ~1.19 kcal, ~1,700 kcal/day): resting burn included.
+- **Health Services** on Pixel Watch 5 delivers passive `Calories`/`Distance` to an ordinary app,
+  Workspace-only too, but its calories (and presumably its stride) follow the watch's own
+  Settings > Health Profile, which OpenWatch cannot read. Using it would make wearers keep two
+  profiles; Matt rejected that ("I don't like that double entry"). **Not used.** Useful only as a
+  reference to compare our estimates against during development (the debug probe reads it).
+- Upstream already follows this approach: cadence-based all-day active calories, heart-rate
+  (Keytel) workout calories (`wearlink/.../WorkoutMetrics.kt` on upstream/main).
 - Phone manifest already declares `WRITE_DISTANCE`, `WRITE_TOTAL_CALORIES_BURNED`,
   `WRITE_ACTIVE_CALORIES_BURNED`, `WRITE_BASAL_METABOLIC_RATE`. The body profile (weight from
   Health Connect, height/age/sex from the app's `BodyProfile`) is already read for workouts.
@@ -48,19 +53,17 @@ Health without any setting (Matt: "ideally it'd coexist without needing toggles"
 ## Non-goals
 
 - Floors (already done), SpO2/HRV/respiratory (no route), workouts through `ExerciseClient`.
-- Any new setting or toggle.
+- Any new setting or toggle; any second profile the wearer must keep.
+- Google's Health Services or any other vendor library in the release build.
 - Changing how workouts compute their own calories/distance.
-- Upstream acceptability (the Health Services dependency is fork-only; see `AGENTS.md` fork section).
 
 ## Anti-goals (would make this a failure even if it works)
 
 - **Doubled totals** in Health Connect: two of OpenWatch's own sources for the same minute, or
   active calories counted inside a total and again on top of it.
-- **A network permission on the watch** (the no-`INTERNET` invariant; Health Services client
-  1.1.0 adds none — re-check the merged manifest).
-- **Silent wrong calories** from a profile the wearer never set. Wrong-but-plausible is worse than
-  absent. (Health Services uses the watch's Health Profile — see Open 1 — so this becomes a setup
-  step, not a code path.)
+- **Double entry**: the wearer having to enter their body data in more than OpenWatch's profile.
+- **Silent wrong numbers** from a profile value the wearer never set (no population defaults
+  standing in for a missing weight or height). Wrong-but-plausible is worse than absent.
 
 ## Approaches considered
 
@@ -69,57 +72,56 @@ Health without any setting (Matt: "ideally it'd coexist without needing toggles"
 - **B. OpenWatch's own estimate only, on the phone.** Distance = steps × stride from height;
   total = active + Mifflin-St Jeor resting burn. Every watch, no new dependency; an estimate
   (distance ±10 % uncalibrated).
-- **C. Both — chosen by Matt.** Health Services where the watch offers it, B everywhere else.
-  Most code, two sources to reconcile, best numbers on Pixel and still works on every watch.
+- **C. Both.** Health Services where the watch offers it, B everywhere else. Chosen first, then
+  dropped: Health Services' numbers depend on the watch's Health Profile, a second profile.
+- **Chosen: B** (Matt, 2026-11-27): one profile, no new dependency, every watch, upstream's own
+  approach extended. Cost: no Google stride calibration.
 
 ## Design (decided)
 
-### Sources, per metric, per minute
+### Sources, per metric, per minute (all computed by OpenWatch on the phone)
 
-| Metric | Watch offers Health Services passive Calories/Distance | Otherwise |
-|---|---|---|
-| Distance | Health Services `Distance` deltas | steps × stride length (from height; sex-specific factor) |
-| Total calories | Health Services `Calories` deltas (total) | active (below) + resting burn (Mifflin-St Jeor per minute) |
-| Active calories | OpenWatch: heart rate (Keytel) when raised, else step cadence (`WalkingEnergy`) | same |
+| Metric | From |
+|---|---|
+| Active calories | heart rate (Keytel) when raised by effort, else step cadence (`WalkingEnergy`, as today) |
+| Total calories | active calories + resting burn (Mifflin-St Jeor, `BasalMetabolicRate`) per minute |
+| Distance | steps × stride length from height (and sex), stride lengthening with cadence |
 
-- **Automatic, no setting**: Health Services is used when its capability check lists the type
-  for this app; otherwise the estimate.
+- Inputs already on the phone after a sync: step minutes, heart-rate samples, the body profile
+  (weight from Health Connect, height/age/sex from `BodyProfile`).
 - Exactly **one OpenWatch record per metric per minute** in Health Connect, keyed by a stable
-  client record id so a re-sync replaces rather than duplicates. If both sources exist for a
-  minute (e.g. Health Services appeared later), the Health Services value wins.
+  client record id so a re-sync replaces rather than duplicates. A minute is re-computed when its
+  inputs grow (late steps or heart rate), like the step records today.
 - **Coexistence with Google Health** is left to Health Connect's app priority (it aggregates one
-  app per data type), so totals do not double. No OpenWatch logic for it.
+  app per data type), so totals do not double. No OpenWatch logic for it, no setting.
+- Minutes inside a recorded workout: keep the workout's own energy/distance and do not also write
+  all-day records for those minutes (the builder confirms how `WearOsStepsImport` already avoids
+  this for active calories — it reads "the exercise sessions present").
 
 ### Watch
 
-- New recorder over Health Services passive monitoring for `Calories` and `Distance`, opt-in only
-  in the sense of capability-probed; lives in a new `wear/.../healthservices/` package shaped like
-  `wear/.../samsung/`. Runs in `WearAppService` like the other recorders.
-- New `WearMetrics` series (per-minute rows, `REPLACE` on the same minute, a week's retention)
-  with their lines in `:wearlink` (`WearLinkProtocol`), plus capability tokens so the phone knows
-  which source a watch has.
-- `health-services-client` moves from `debugImplementation` to `implementation` in
-  `wear/build.gradle.kts`; lockfiles/verification metadata updated.
+- **No new watch recording.** Everything is computed from data the watch already sends.
 - Complications: **Calories** and **Distance**, today's running figure, same style and update
-  behaviour as the Steps complication. Data: the phone's daily figures (`PhoneDays`), plus the
-  watch's own Health Services minutes for today when present so the wrist is not a sync behind.
-- The existing Distance and Active-calories tiles keep their source (phone daily figures).
+  behaviour as the Steps complication, fed by the phone's daily figures (`PhoneDays`). The figure
+  is as fresh as the last sync (30-min auto-sync), as the tiles are today.
+- The existing Distance and Active-calories tiles keep their source (phone daily figures), which
+  now holds OpenWatch's own numbers for wearers without Google Health.
 
 ### Phone
 
-- Import the new watch series and write `DistanceRecord` and `TotalCaloriesBurnedRecord` per
-  minute (`devices/wearos`, alongside `WearOsStepsImport`).
-- For minutes without Health Services: compute distance and total calories from the step
-  minutes, the heart rate samples and the body profile (`health-calculations`, pure and tested).
-- Change the all-day `ActiveCaloriesBurnedRecord` minutes to the heart-rate-or-cadence rule.
-- `PhoneDays`/`readDayTotals` additionally carries total calories if a tile/complication shows it.
+- Pure calculations in `health-calculations` (tested): per-minute active energy (heart rate or
+  cadence), resting energy, stride/distance.
+- `devices/wearos`: write `DistanceRecord` and the total-calories records per minute alongside
+  `WearOsStepsImport`; switch its `ActiveCaloriesBurnedRecord` minutes to the new rule.
+- `PhoneDays`/`readDayTotals`/`WearLinkDaily` additionally carry total calories if the
+  complication shows it.
 
 ### Missing profile
 
 - No weight → no calories of any kind (as today), and the existing "no body weight" sync notice.
-- No height → stride from a population default is **not** used; distance from the estimate is
-  skipped (Health Services distance still written). Same rule for age/sex as `WorkoutEnergy`
-  already applies (mean of both sexes without sex; no Keytel without age).
+- No height → no distance (no population default); a sync notice like the weight one.
+- Age/sex as `WorkoutEnergy` already does: mean of both sexes without sex; no Keytel without age
+  (cadence only).
 
 ## Left to the builder
 
@@ -131,32 +133,25 @@ Health without any setting (Matt: "ideally it'd coexist without needing toggles"
 - Whether "Calories" on the complication shows total or active (suggest **total**, as Google does,
   with active on the existing tile).
 - Exact wire format, capability names, record id prefixes; following existing patterns.
-- How the watch learns the resting heart rate it needs for the threshold (phone already has it
-  in `PhoneDays`).
+- Where the resting heart rate for the threshold comes from (the phone already computes one).
 
 ## Open — verify early in the build
 
-1. ~~Where Health Services gets the wearer's profile~~ — **answered 2026-11-27**: from the watch's
-   own **Settings > Health Profile** (stored in Health Services' `ProfileContentProvider`; written
-   by Settings, which runs as system, and by Fitbit, the only other holder of
-   `WRITE_PROFILE_INFO`). Verified on Matt's watch: raising the weight ~20 kg raised the resting
-   burn from 1.084 to 1.244 kcal/min; restoring 150 lb restored 1.084 (probes
-   `probe-20261127-190838`, `-191345`). So Health Services' calories are right **if the wearer
-   fills in Health Profile on the watch**. OpenWatch cannot read that profile
-   (`READ_PROFILE_INFO` is signature|privileged), so the two profiles (watch Health Profile for
-   Health Services, OpenWatch's own body profile for the estimate) can disagree. Decision for the
-   build: keep Health Services as the calories source where offered; the setup docs / onboarding
-   tell family members to fill in Health Profile on the watch.
-2. **Health Connect's total-calories aggregate**: confirm whether it already derives a total from
-   active + basal records when no total records exist; if so, write `BasalMetabolicRateRecord`
-   instead of per-minute totals on the estimate path to avoid double counting.
+1. **Health Connect's total-calories aggregate**: confirm whether it already derives a total from
+   active + basal records when no total records exist. If so, write `BasalMetabolicRateRecord`
+   (or per-minute resting energy as the API allows) instead of `TotalCaloriesBurnedRecord`, so the
+   active share is not counted twice.
+
+Answered during design (kept for the record): Health Services' calories follow the watch's
+Settings > Health Profile (weight +20 kg moved the resting burn 1.084 → 1.244 kcal/min and back;
+see the sensor map). That is why it is not used.
 
 ## Done when
 
-- On Matt's Pixel Watch 5 with Google Health signed out or absent: a day's distance and total
-  calories appear in Health Connect under OpenWatch, plausible against Health Services' daily
-  figures; complications show today's values on the stock face.
-- On a watch without Health Services (emulator or Samsung): the estimate path writes them.
+- On Matt's Pixel Watch 5: a day's distance and total calories appear in Health Connect under
+  OpenWatch; compared with Health Services' daily figures (debug probe) for the same day, distance
+  within ~10 % and resting/total calories plausible for his profile.
+- Active calories rise on a bike ride or strength session where steps stay low.
+- Complications show today's values on the stock face.
 - With Google Health present: Health Connect's daily totals do not double.
-- `./gradlew verifyCi verifyWearCi` and the wiki check pass; merged watch manifest has no
-  network permission.
+- `./gradlew verifyCi verifyWearCi` and the wiki check pass.
