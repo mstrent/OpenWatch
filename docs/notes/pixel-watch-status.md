@@ -36,7 +36,8 @@ data as an ordinary app can actually reach.
   **The goal's minimum bar is met on Matt's setup.**
 - Survey steps 1–4 **done** on Matt's Pixel Watch 5. Day of wear (12.6 h): `hub-40s`
   batches arrive (Q3), **no heart rate freeze beside the stock stack** (Q4), doze drain
-  2.24 %/h; accelerometer only ~60 % whole in doze (new follow-up, matters for sleep).
+  2.24 %/h; accelerometer only ~60 % whole in doze — a night's data (2026-11-28) shows the gaps
+  follow stillness and every sleep minute is recorded; M3 closed without changes.
 - **Feasibility verdict: the minimum bar is reachable** with what an ordinary app gets
   (raw heart rate + step counter, unchanged OpenWatch code paths), pending the all-day
   data. Beyond the bar: skin temperature is newly reachable (raw sensor; OpenWatch now
@@ -232,7 +233,8 @@ see the emulator design gate in the 2026-11-26 Lobe AI journal entry). **Current
    Cheaper research step first (no wipe): an overnight vendor-log capture (2026-11-27 late
    evening journal); the vendor log already names the private types.
 3. The development plan below: M1 and M2 done. Matt's OK per milestone gates what follows:
-   **M3** (narrowed to the doze accelerometer gap, ~60 % whole; matters for sleep) and **M4**
+   **M3** — **closed 2026-11-28, no hardening needed** (one night: every minute recorded; the
+   accelerometer gap follows stillness) — and **M4**
    ~~(calories/distance)~~ — dropped 2026-11-27, see Decisions log. Still owed on the Workspace-only watch: a
    day-of-wear repeat of the HR contention check (question 4).
 4. Before any push of code: `./gradlew verifyCi verifyWearCi` and
@@ -336,6 +338,18 @@ Google Health. The existing Samsung paths for them stay untouched.
   permission ≠ network permission, but check what a dependency drags in).
 
 ## Session journal (newest first)
+
+### 2026-11-28 (morning) — Claude Code (session: the night's report, M3)
+- `wear-debug-report.py` + the watch's `metrics.db` over the night (bedtime 22:00–07:55, synced
+  hold all night, no wake lock). Details in the sensor map, "a night of wear".
+- **M3 verdict: no hardening needed.** Every minute of the night has a sleep row and heart rate;
+  no batch lost. The accelerometer thins out while the wrist is still (median 196 of ~378
+  readings a minute, 14 % of minutes empty, each isolated); the gaps follow stillness, and
+  movement is already normalised per reading, so the sleep input holds. Bedtime drain 1.69 %/h.
+- **Skin fixes verified on the watch:** night rows only inside the hold (114), day rows only
+  outside it (159). Still to check on the phone: last night's sleep estimate, and the night skin
+  rows in Health Connect. Then PR 3.
+- Watch still has the debuggable build.
 
 ### 2026-11-27 (night, 2) — Claude Code (session: review + first upstream PR)
 - **Upstream PR opened: [Hale-MTU/OpenWatch#96](https://github.com/Hale-MTU/OpenWatch/pull/96)**

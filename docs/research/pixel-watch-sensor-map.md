@@ -229,6 +229,29 @@ consumer account):
   sleep estimate (Q8); not yet explained (non-wake sensor, FIFO not overflowing on paper).
 - Skin tracker 0 events: the watch was still running the pre-M1 build (installed 09:22).
 
+## Verified: a night of wear (2026-11-27 22:00 to 2026-11-28 07:55, debug watch app)
+
+`wear-debug-report.py` and the watch's own `metrics.db` (pulled with `run-as`) over Matt's night.
+Pixel bedtime mode on 22:00 to 07:55; the synced sleep hold held all of it (475 min, no wake
+lock); the watch now has a consumer account again.
+
+- **Every minute of the night has a sleep row (596 of 595) and every one has heart rate.**
+  No lost batch, no heart rate gap. Drain in bedtime doze 1.69 %/h (8.9 h).
+- **Accelerometer:** whole minutes hold ~378 readings (the hub runs the 5 Hz request at
+  6.25 Hz; screen-on minutes are whole). In bedtime doze the median minute has 196, and 81
+  minutes (14 %) have none, each a single isolated minute. Over the day's doze: median 223,
+  9 % empty.
+- **The readings missing follow stillness, not lost batches**: minutes with fewer than 200
+  readings move (movement > 0) 35 % of the time, whole minutes 70 %; the neighbours of an empty
+  minute move 35 % of the time against 50 % overall. The hub appears to send the non-wake-up
+  accelerometer less, or not at all, while the wrist is still. Inferred, not shown from the
+  hub's side. `MinuteAggregator` already normalises movement by the sample count, so a partial
+  minute is scored at full scale; an empty one scores as still, which these numbers say is
+  usually right. The `SPARSE` flag (< 150 readings) is set but nothing downstream reads it.
+- **Skin temperature split (the review fixes):** 114 night minutes (`sk`), all inside the
+  hold; 159 day minutes (`skd`), none inside it. Whether the night rows reached the phone and
+  Health Connect is not checked here (phone not on adb).
+
 ## Verified: what the vendor log shows (2026-11-27 evening, adb only)
 
 With **Developer options > "Enable verbose vendor logging"** on, `adb logcat -b all` (shell user,
@@ -382,7 +405,8 @@ signed in or out.
    bpm + status (no intervals) and steps/min; see the verified capture above.
 3. ~~Does the Pixel hub hold the `hub-40s` batches?~~ — **answered 2026-11-26: yes**, delivered
    about every 25 s in doze; see "a day of wear" above. Follow-up: why the accelerometer is only
-   ~60 % whole in doze.
+   ~60 % whole in doze — **answered 2026-11-28**: the gaps follow stillness, not lost batches;
+   see "a night of wear" above.
 4. ~~Does batched heart rate beside the stock stack freeze either reader?~~ — **answered
    2026-11-26: no** over 12.6 h (consumer-account watch; repeat once on a Workspace-only watch).
 5. ~~Is `TYPE_HEART_BEAT` present?~~ — **answered 2026-11-26: no.** HRV on the raw path stays off;
@@ -395,6 +419,9 @@ signed in or out.
    complications work on the stock Pixel face, and OpenWatch's tiles are in the tile list.
    Not checked one by one: the third provider and every slot type (short text, ranged
    value).
-8. Samsung's bedtime mode has no Pixel equivalent. Does the Pixel's own bedtime/sleep mode, or
+8. **Answered 2026-11-28 (one night):** with Pixel bedtime mode and the synced hold every
+   minute has a row and heart rate; the accelerometer thins out when still (see "a night of
+   wear"). Whether the phone's sleep estimate found the night is checked on the phone.
+   Original question: Samsung's bedtime mode has no Pixel equivalent. Does the Pixel's own bedtime/sleep mode, or
    Do Not Disturb, keep the accelerometer whole enough at night for the sleep estimate to find the
    night, the way the Galaxy section of this map had to learn it did not?
