@@ -215,6 +215,11 @@ see the emulator design gate in the 2026-11-26 Lobe AI journal entry). **Current
    wear-install fixes (permissions, pipefail, compile sideloads), jank capture script. Fork-only,
    not for upstream: the debug Health Services probe (vendor library, even debug-only), these
    notes. Sort into small PRs against `Hale-MTU/OpenWatch`, each re-checked against `AGENTS.md`.
+   Split decided 2026-11-27: PR 2 install script — **open as #96**; PR 3 Pixel raw skin temperature +
+   skin_sensor token + phone toggle (after tonight's on-wrist check); PR 4 all-day skin, "now" card,
+   variation tile/complication + caption wrap — waits for the variation calculation to move into
+   `health-calculations` (its own PR there, via a fork of that repo). Not upstream: settings GC fix
+   (upstream #83), the Health Services probe, the jank script (for now).
 
 1. ~~Finish M1~~ — done 2026-11-27 night (phone skin switch verified). Strava/Zepp: Strava only reads workouts from Health Connect, so nothing
    to see until a workout is recorded; Zepp not checked.
@@ -331,6 +336,28 @@ Google Health. The existing Samsung paths for them stay untouched.
   permission ≠ network permission, but check what a dependency drags in).
 
 ## Session journal (newest first)
+
+### 2026-11-27 (night, 2) — Claude Code (session: review + first upstream PR)
+- **Upstream PR opened: [Hale-MTU/OpenWatch#96](https://github.com/Hale-MTU/OpenWatch/pull/96)**
+  — `wear-install.sh` grants ACTIVITY_RECOGNITION/skin/SpO2, compiles non-debuggable sideloads,
+  pipefail-safe matching. Cut from `upstream/main` as branch `upstream/wear-install-grants-compile`
+  on the fork, without the fork-only `--probe`. Verified on the watch.
+- Upstream already fixed the settings-after-GC bug themselves (#83): our `f195510` is dropped
+  from the upstream list. The tile-caption wrap (`93c656a`) has no upstream-visible failure on its
+  own (their longest caption is 24 chars) — it rides with the skin variation tile PR.
+- **Whole-branch code review** (`/code-review high`) found 3 important + 7 nits, no crashes.
+  Fixed test-first and pushed (`a43e1df`, `2190e7c`, `e5209be`): skin minutes written once as the
+  mean (SkinMinuteBuffer), routed by their own time against the hold windows (SkinHoldWindows),
+  FIFO points no longer dropped as stale (only the pre-registration cached reading), skin_sensor
+  means the raw sensor only, Skin-now card only on all-day watches and kept with the week (day
+  series kept a week), phone switch says "all day" on a raw-sensor watch. Not fixed: the watch's
+  SkinVariation differs from the phone's baseline rules (belongs in shared `health-calculations`
+  before its PR), the jank script's median (script not going upstream yet).
+- `verifyCi verifyWearCi`, translations and wiki check green. Fixed builds installed on watch
+  (debug, for tonight's report) and phone at 20:03.
+- **Tonight (M3 + the fixes):** Matt wears the watch to bed. Tomorrow: `wear-debug-report.py`
+  for hold coverage and accelerometer completeness during sleep; skin night rows synced, day rows
+  watch-only; then open the Pixel skin temperature PR (PR 3 in Next action 0).
 
 ### 2026-11-27 (late evening, 2) — Claude Code (session: ECG under the vendor log)
 - **Matt re-added the consumer Gmail account** so the Fitbit ECG app would run. The test watch is
