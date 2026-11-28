@@ -262,7 +262,18 @@ ran unbroken, 36k lines). Raw captures hold GPS fixes during workouts: keep them
 - **Values that do appear**: hub heart rate with a confidence (`Heart Rate: 76.0, Confidence: 4`),
   sleep classification every 30 s, passive calories/distance/steps, workout pace/distance/calories,
   activity-recognition features as hex. Nothing for SpO2, HRV, respiratory rate or EDA values.
-- ECG could not be run: the ECG app needs a signed-in Google Health account.
+- **ECG (2026-11-27, consumer account re-added so the ECG app would run).** The ECG app turns on
+  **airplane mode** for the reading (Wi-Fi off, so adb over Wi-Fi drops and a live stream cannot
+  cover it). Workaround: `adb logcat -G 64M` first (logd buffers 64 KiB → 64 MiB, accepted for the
+  shell user), take the ECG, reconnect, `logcat -d -b all`, then `logcat -G 64K` to restore.
+  What it shows: the app reads ECG as an ordinary Android sensor through the sensor HAL —
+  `ECG Sensor` at 4 ms (250 Hz, batched 64 ms) plus `ECG Lead Detector` at 200 ms — i.e. the
+  signature-gated ECG sensor already in the sensor list, no separate path. On the hub the shared
+  analog front end (`AfeTi…`) goes to `Mode[mixed]` op 106: continuous EDA cleared, PPG kept at
+  1 channel, decimation 10, heart-rate channels 0 (no HR during ECG), ECG electrodes on. Lead
+  contact (`Leads on: 1`) 4 s after start; sampling stopped 34 s later. **No rhythm result or
+  sample values are logged** — classification happens in the ECG app (`ECGlib`, JNI), not the hub.
+  Root would let a test app read the raw 250 Hz waveform from that sensor; nothing else would.
 
 ## What ordinary apps reach on Pixel Watch (reported, not verified here)
 

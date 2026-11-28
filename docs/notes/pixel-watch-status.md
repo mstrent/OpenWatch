@@ -312,6 +312,17 @@ Google Health. The existing Samsung paths for them stay untouched.
 
 ## Session journal (newest first)
 
+### 2026-11-27 (late evening, 2) — Claude Code (session: ECG under the vendor log)
+- **Matt re-added the consumer Gmail account** so the Fitbit ECG app would run. The test watch is
+  **no longer Workspace-only**; Workspace-only findings above stay valid as recorded, but new
+  Health Services results from now on carry the consumer-account caveat again.
+- ECG turns on airplane mode for the reading, so adb over Wi-Fi drops; captured instead by
+  enlarging logd (`logcat -G 64M`), reading after reconnect, then restoring 64K (done). Findings
+  in the sensor map: ECG is the ordinary signature-gated `ECG Sensor` (250 Hz) + lead detector;
+  hub front end switches to a mixed ECG/PPG op; no result or samples in the log.
+- Watch: logd buffer restored to 64 KiB; debuggable OpenWatch build still installed.
+- Lesson: keep captures short (Matt: 2 min, not 8–11) and state the duration before starting.
+
 ### 2026-11-27 (late evening) — Claude Code (session: vendor log capture)
 - Matt turned on **OEM unlocking** (no effect by itself: `ro.boot.flash.locked=1`, verified boot
   green, `user` build, `adb root` refused) and **verbose vendor logging** (useful: the hub firmware
