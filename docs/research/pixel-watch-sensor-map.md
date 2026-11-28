@@ -114,7 +114,7 @@ Open to an ordinary app (AOSP gate or none):
 | Type | Vendor | Gate (`perm:`) | FIFO | Note |
 |---|---|---|---|---|
 | `android.sensor.heart_rate` (21) | Google | `health.READ_HEART_RATE` | 3000 | processed bpm, on-change |
-| `com.google.sensor.heart_rate_extended` (131086) | Google | `health.READ_HEART_RATE` | 3000 | vendor type behind the **public** HR grant; payload unknown (worth probing for beat intervals/confidence) |
+| `com.google.sensor.heart_rate_extended` (131086) | Google | `health.READ_HEART_RATE` | 3000 | vendor type behind the **public** HR grant; **verified 2026-11-26 and 2026-11-27**: `[bpm, 0, status, 0…]`, the same stream as `heart_rate` — no beat intervals (see below) |
 | `android.sensor.step_counter` (19), `step_detector` (18) | Google | `ACTIVITY_RECOGNITION` | 3000 | AOSP way |
 | `com.google.sensor.step_cadence` (131087) | Google | `ACTIVITY_RECOGNITION` | 3000 | vendor type behind a public grant |
 | `com.google.sensor.skin_temperature` (65555) | TI | `health.READ_SKIN_TEMPERATURE` | 3000 | **open**: a raw skin temperature route behind the public Android 16+ grant |
@@ -195,9 +195,17 @@ Workspace-only watch before relying on the Health Services rows.
   minutes (same values, both ~0.5 Hz). The all-day contention test (question 4) still stands.
 - **`heart_rate_extended`** is not beat intervals: `values = [bpm, 0, status, 0…]`, where the status
   follows the sensor's accuracy (3/2/1, and -1 off the wrist). No HRV route here.
+  **Re-checked 2026-11-27 (night)** at `SENSOR_DELAY_FASTEST`, worn, 324 s covering rest, walking
+  and arm movement, with a per-slot summary of *every* event (probe `--ez fastest true`): 170 events
+  (~0.5 Hz, the fastest rate does not speed it up), exactly as many as `android.sensor.heart_rate`
+  with the same bpm range (65–94); slot 0 = bpm, slot 2 = status (2–3), **slots 1 and 3–15 zero in
+  every event**. It is the public heart rate re-labelled. This closes the Samsung-style no-root HRV
+  route on Pixel: Samsung's `PpgWindowSource` reads raw PPG under the ordinary HR grant, but the
+  Pixel's raw PPG (65572) is `READ_PRIVATE_SENSORS` and this is the only sensor behind the HR grant.
 - **`skin_temperature`** delivers real wrist temperature in °C in `values[0]` (resolution 1/128 °C)
   about every 30 s: 24.7 °C off the wrist, rising from 29.8 to 30.6 °C after putting it on.
-- **`step_cadence`** reports `-1` at rest; its walking values are not yet seen.
+- **`step_cadence`** reports `-1` at rest and in pauses; walking (2026-11-27) gives steps/min in
+  `values[0]` (about 90–103), other slots zero, several events a second.
 
 ## Verified: a day of wear (2026-11-26, debug watch app, 08:56–21:32)
 
@@ -262,9 +270,9 @@ third-party apps does not.
 |---|---|---|
 | Heart rate, steps, ascent | Raw sensors, the same code as on Galaxy. **Verified 2026-11-26:** a day of wear with no contention freeze, batches arrive, and sync lands heart rate and steps in Health Connect (M0). Health Services stays the alternate route | built on raw, **works on Pixel** |
 | Sleep stages | From heart rate and motion (`SleepStageEstimator`); Health Services may offer the vendor's own sleep on a device that supports it | built, unverified on Pixel |
-| HRV (RMSSD), respiratory rate | Needs beat intervals. **Verified closed on Pixel Watch 5 (2026-11-26):** no `TYPE_HEART_BEAT`, raw PPG signature-gated, `heart_rate_extended` carries no intervals, and Health Services lists no public HRV/respiratory type (the private ones need `OEM_OPAQUE_DATA_ACCESS`) | degrades off by the capability gate |
+| HRV (RMSSD), respiratory rate | Needs beat intervals. **Verified closed on Pixel Watch 5 (2026-11-26):** no `TYPE_HEART_BEAT`, raw PPG signature-gated, `heart_rate_extended` carries no intervals (re-checked at full rate while moving, 2026-11-27), and Health Services lists no public HRV/respiratory type (the private ones need `OEM_OPAQUE_DATA_ACCESS`) | degrades off by the capability gate |
 | SpO2 | **Verified closed (2026-11-26):** no SpO2 sensor listed; no public Health Services type | degrades off |
-| Skin temperature | **Open at the sensor** (`com.google.sensor.skin_temperature`, `READ_SKIN_TEMPERATURE`, verified 2026-11-26); Health Services also has a type where a device supports it | the watch app reads skin temperature only from the Samsung tracker today; a Pixel route needs code |
+| Skin temperature | **Open at the sensor** (`com.google.sensor.skin_temperature`, `READ_SKIN_TEMPERATURE`, verified 2026-11-26); Health Services also has a type where a device supports it | the watch app reads the Pixel raw sensor (M1); **verified on the watch 2026-11-27** (rows land, toggle works) |
 | Calories, distance, floors | No route from the raw sensors OpenWatch reads; **Health Services delivers them to an ordinary app (verified 2026-11-26, consumer-account caveat)** | not built |
 | ECG, body composition, skin conductance | Gated | not built |
 
@@ -310,14 +318,15 @@ signed in or out.
    Blood Pressure measure type — none offered by the Pixel Watch 5.)
 2. ~~The full sensor list with permission gates~~ — **answered 2026-11-26**: heart rate is gated by
    `READ_HEART_RATE` only (on Android 17); see the verified capture above. New follow-up: what do
-   `heart_rate_extended` and `step_cadence` carry in their event values?
+   `heart_rate_extended` and `step_cadence` carry in their event values? — **answered 2026-11-27**:
+   bpm + status (no intervals) and steps/min; see the verified capture above.
 3. ~~Does the Pixel hub hold the `hub-40s` batches?~~ — **answered 2026-11-26: yes**, delivered
    about every 25 s in doze; see "a day of wear" above. Follow-up: why the accelerometer is only
    ~60 % whole in doze.
 4. ~~Does batched heart rate beside the stock stack freeze either reader?~~ — **answered
    2026-11-26: no** over 12.6 h (consumer-account watch; repeat once on a Workspace-only watch).
-5. ~~Is `TYPE_HEART_BEAT` present?~~ — **answered 2026-11-26: no.** HRV on the raw path stays off
-   unless `heart_rate_extended` turns out to carry beat intervals.
+5. ~~Is `TYPE_HEART_BEAT` present?~~ — **answered 2026-11-26: no.** HRV on the raw path stays off;
+   `heart_rate_extended` carries no beat intervals either (2026-11-27).
 6. ~~Which Health Services data types does a Pixel Watch 5 list?~~ — **answered 2026-11-26**:
    see the two verified Health Services sections above; calories, distance and floors appear,
    the vitals do not.

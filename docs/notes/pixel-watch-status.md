@@ -18,12 +18,15 @@ Strava and Zepp) and are **visible on the watch face**, even when Google Health 
 Fitbit is absent or not signed in. Nice-to-have: expose as much Pixel Watch sensor
 data as an ordinary app can actually reach.
 
-## Status (as of 2026-11-26 night: M0 verified, M1/M2 implemented, jank attributed)
+## Status (as of 2026-11-27 night: M0 verified, M1 verified on the watch, no-root vitals closed)
 
-- **Phase: M1 (Pixel skin temperature) and M2 (install ergonomics) are implemented and
-  locally gate-verified, committed and pushed on 2026-11-26** (journal below). What is
-  left for M1/M2 is the on-watch bench check. The on-device survey continues (steps
-  3–4 collecting).
+- **Phase: M1 (Pixel skin temperature) and M2 (install ergonomics) are done.** M1 verified on
+  the watch 2026-11-27: skin rows land, the "Skin temp now" card reads, and the watch's toggle
+  works (Matt). Only the phone app's skin toggle appearing is unchecked.
+- **The test watch is Workspace-only since 2026-11-27** (consumer account removed); the Health
+  Services offer did not change. **Every no-root route to HRV, SpO2 and respiratory rate is
+  now closed on the watch**, including the Samsung-style one (`heart_rate_extended`, re-checked
+  at full rate while moving). What remains for those is root, for research only.
 - **M0 done 2026-11-26: the minimum bar works end to end.** Debug phone app on Matt's
   Pixel 10 Pro, watch linked (companion association + Validate), 30-min auto-sync and
   manual sync both run; **heart rate and steps are in Health Connect under "OpenWatch"**
@@ -40,9 +43,10 @@ data as an ordinary app can actually reach.
   calories/distance/floors/running dynamics are reachable through Health Services
   (needs code + the dependency). **SpO2, HRV and respiratory rate are not reachable on
   Pixel** by any route that fits the Workspace-only rule (see route verdicts).
-- Caveat on every Health Services result so far: Google Health is signed in on the test
-  watch **with a consumer Gmail account**. Results must be repeated on a Workspace-only
-  watch (Decisions log) before they count.
+- The consumer-account caveat on Health Services results is lifted for the capability table
+  and refusals (same on the Workspace-only watch, 2026-11-27). Data *delivery* through Health
+  Services on the Workspace-only watch: the 2026-11-27 night probe got passive and measured
+  heart rate; calories/distance/floors delivery not re-checked yet.
 - Code changes need Matt's approval before implementation; the milestone plan is
   under "Development plan".
 
@@ -52,7 +56,7 @@ data as an ordinary app can actually reach.
 |---|---|
 | Raw sensors: heart rate, step counter/detector, barometer, off-body, accelerometer | **Open**, AOSP permissions, verified delivering |
 | Raw `com.google.sensor.skin_temperature` | **Open** behind `health.READ_SKIN_TEMPERATURE`, real °C ~every 30 s; now OpenWatch's skin source on Pixel (M1, bench check pending); the Samsung path stays where present |
-| Raw `heart_rate_extended`, `step_cadence` | Open but uninteresting: bpm + status; cadence `-1` at rest. **No beat intervals** |
+| Raw `heart_rate_extended`, `step_cadence` | Open but uninteresting: the public bpm + status (re-checked at full rate while moving, 2026-11-27); cadence = steps/min walking, `-1` at rest. **No beat intervals** |
 | Raw PPG, ECG, GSR, 50/100 Hz IMU | **Closed**: `com.google.pixelwatch.permission.READ_PRIVATE_SENSORS` (signature) |
 | `TYPE_HEART_BEAT` | **Absent** |
 | Health Services public types (HR, steps, distance, calories, floors, elevation, sleep state, exercise metrics) | **Open and delivering** to our app — consumer-account caveat above |
@@ -102,8 +106,8 @@ data as an ordinary app can actually reach.
   `wear-ppg-hrv.md` mark verified (TicWatch Pro 5, Galaxy Watch8).
 - **Reported, not verified here**: Workspace accounts unsupported in Google Health
   (community threads); Google Health app's Health Connect write set.
-- **Untested** (research doc open questions 1, 3, 4, 7, 8): Health Services on a
-  Workspace-only watch; hub batch delivery over a day; HR contention over a day;
+- **Untested** (research doc open questions 1, 3, 4, 7, 8): Health Services calories/distance/
+  floors delivery on the Workspace-only watch; HR contention over a day on it;
   stock-face complication slots and tiles vs Wear Widgets on Wear OS 7; night
   accelerometer under Pixel bedtime mode.
 
@@ -140,12 +144,15 @@ The watch:
   the connect port changes, `adb mdns services` shows it).
 - Survey probe (debug builds only): `adb -s <w> shell am start -n
   tech.mmarca.openwatch.debug/tech.mmarca.openwatch.wear.debug.HealthProbeActivity
-  --ei seconds 120`, worn, then `adb -s <w> exec-out run-as tech.mmarca.openwatch.debug
+  --ei seconds 120` (add `--ez fastest true` for raw sensors at full rate; a per-slot summary
+  of every event is written at the end), worn, then `adb -s <w> exec-out run-as tech.mmarca.openwatch.debug
   ls files/debug` and `cat files/debug/probe-<time>.jsonl`. Source:
   `wear/src/debug/kotlin/tech/mmarca/openwatch/wear/debug/HealthProbeActivity.kt`.
   `scripts/wear-install.sh --probe` (debug variant) now starts it and pulls the
   `probe-*.jsonl` files to `reports/` in one shot: default 130 s, override with
-  `--probe-seconds <n>`.
+  `--probe-seconds <n>`. Caveat (2026-11-27): the script only *waits* that long; it does not pass
+  `seconds` to the activity, which then runs its default 90 s. Needs the **debuggable** build
+  (plain `assembleDebug`); on the fast build `run-as` fails and nothing is pulled.
 - Health Services' own view: `adb shell dumpsys activity service
   com.google.android.wearable.healthservices`. Accounts (don't paste addresses into
   the repo): `adb shell dumpsys account`.
@@ -187,19 +194,20 @@ see the emulator design gate in the 2026-11-26 Lobe AI journal entry). **Current
 
 ## Next actions
 
-1. **After M0:** install the current watch build (`scripts/wear-install.sh`; the watch still runs
-   the 09:22 pre-M1 build) and do the M1 bench check — skin rows after a night, and the
-   phone's skin toggle appearing. Strava/Zepp: Strava only reads workouts from Health
-   Connect, so nothing to see until a workout is recorded; Zepp not checked.
+1. **Finish M1:** check that the phone app shows the skin toggle for the Pixel watch. (Watch side
+   verified 2026-11-27.) Strava/Zepp: Strava only reads workouts from Health Connect, so nothing
+   to see until a workout is recorded; Zepp not checked.
    Note: Google Health also writes the watch's steps/HR to Health Connect, so with both apps
    present Health Connect's app priority decides which counts (total did not double: 3,532).
-2. **Repeat the probe on a Workspace-only watch** (another family watch, or Google
-   Health signed out on Matt's). Decides whether the Health Services rows hold.
-3. The development plan below: **M1 and M2 are implemented, gated and pushed** (see
-   journal), including the phone-side parity follow-up (skin_sensor token + phone skin
-   toggle for raw-sensor watches, 2026-11-26) — what is left is the M1 on-watch bench check.
-   Matt's OK per milestone still gates what follows: M3 (step 1's data is in: batching is
-   fine, so M3 narrows to the doze accelerometer gap), M4 on step 2.
+2. **Vitals beyond skin temperature (HRV, SpO2, respiratory rate): no no-root route is left**
+   (2026-11-27 night). Decide: root the test watch for research only (bootloader unlock wipes
+   it; even then an ordinary app cannot read the private types, so it would not ship to the
+   family) — or stop here and put the effort into M3/M4. Recommended: stop.
+3. The development plan below: M1 and M2 done. Matt's OK per milestone gates what follows:
+   **M3** (narrowed to the doze accelerometer gap, ~60 % whole; matters for sleep) and **M4**
+   (Health Services source for calories/distance/floors — first re-check their delivery on the
+   now Workspace-only watch with the probe). Still owed on the Workspace-only watch: a
+   day-of-wear repeat of the HR contention check (question 4).
 4. Before any push of code: `./gradlew verifyCi verifyWearCi` and
    `python3 scripts/sync-wiki.py --repo mstrent/OpenWatch --check`. (`verifyWearCi`
    passed on 2026-11-26 with the probe in the debug source set.)
@@ -302,6 +310,29 @@ Google Health. The existing Samsung paths for them stay untouched.
 
 ## Session journal (newest first)
 
+### 2026-11-27 (night) — Claude Code (session: heart_rate_extended full-rate re-check; docs corrected)
+**The Samsung-style HRV lead is closed on Pixel; no no-root route to HRV/SpO2/respiratory remains.**
+
+- Found that the previous session's "unprobed" lead (`heart_rate_extended`, 131086) had been
+  probed on 2026-11-26; the sensor-map table was stale. Matt asked for a stronger re-check anyway.
+- Probe change (debug source set only): `--ez fastest true` registers the raw sensors at
+  `SENSOR_DELAY_FASTEST`, and every run now ends with a `sensor.summary` per sensor over *all*
+  events (per slot: min, max, non-zero count, distinct values), not only the first 40 logged.
+- Result (`probe-20261127-172506.jsonl`, worn, 324 s: rest, walking, arm movement):
+  `heart_rate_extended` = 170 events, same count and bpm range (65–94) as `android.sensor.heart_rate`,
+  slot 2 = status (2–3), every other slot zero in every event. The fastest rate does not speed it up
+  (~0.5 Hz). It is the public heart rate re-labelled. `step_cadence` walking values seen for the
+  first time: steps/min in slot 0 (~90–103), `-1` at rest and in pauses.
+- Matt: the watch's skin temperature toggle works. M1 done but the phone toggle check.
+- Pitfalls hit: (1) the previous journal gave `OPENWATCH_PUBLISHED_DEBUG_APK=true` as the way to
+  get the *debuggable* build; it is the opposite (fixed in that entry). On the fast build the
+  probe runs but `run-as` cannot pull its file. (2) Reinstalling the app kills a running probe
+  before its summary (first 5-min run lost its summary that way). (3) `wear-install.sh --probe`
+  does not pass `--probe-seconds` to the activity (noted under setup; not fixed).
+- Gates: `verifyWearCi` passed (needs `ANDROID_HOME` exported on this machine). Watch left on the
+  **debuggable** build (janky); reinstall the fast build when the survey is done. Remind Matt to
+  turn Wireless debugging off.
+
 ### 2026-11-27 (evening) — Claude Code (session: Samsung-clue analysis; root decision pending)
 **All non-root hypotheses for the Pixel vitals are now closed on the real watch; one reachable
 sensor remains unprobed; root is the next step and needs Matt's hands.**
@@ -322,6 +353,9 @@ sensor remains unprobed; root is the next step and needs Matt's hands.**
   satisfy it. (2) Samsung's *default* HRV source is not the IBI service but `PpgWindowSource`
   reading raw PPG (`com.samsung.sensor.hr_raw`, 25 Hz) via plain `SensorManager` under the
   ordinary HR permission, fed to the device-agnostic pipeline `PpgBeats -> HrvRmssd -> NightHrv`.
+- **Correction (2026-11-27 night): this lead had already been probed on 2026-11-26** (bpm + status,
+  no intervals; the sensor-map table still said "payload unknown"). Re-checked at full rate while
+  moving the same night — closed. See the next journal entry.
 - **The one no-root lead left, reachable NOW (no wipe):**
   `com.google.sensor.heart_rate_extended` (131086), gated by `health.READ_HEART_RATE` — a grant
   the app already holds. Payload undocumented. If it carries beat intervals / confidence / a
@@ -342,8 +376,9 @@ sensor remains unprobed; root is the next step and needs Matt's hands.**
   now (wipe; only route to SpO2/private streams) vs. both in parallel. I recommend probing 131086
   first — cheap, reversible, and it is the direct application of the Samsung lesson.
 - **Watch state:** fast build reinstalled and confirmed NOT debuggable (so `run-as` probes need
-  the debug build reinstalled first: `OPENWATCH_PUBLISHED_DEBUG_APK=true ./gradlew :wear:assembleDebug`
-  then `scripts/wear-install.sh --serial <w>`). Wireless-debugging address changes on reboot
+  the debuggable build reinstalled first: plain `./gradlew :wear:assembleDebug`, **without**
+  `OPENWATCH_PUBLISHED_DEBUG_APK` — that flag makes the *fast, non-debuggable* build; corrected
+  2026-11-27 night — then `scripts/wear-install.sh --serial <w>`). Wireless-debugging address changes on reboot
   (`adb mdns services`); remind Matt to turn Wireless debugging off when done.
 
 ### 2026-11-27 (late afternoon) — Claude Code (session: vendor-app exclusivity test)
