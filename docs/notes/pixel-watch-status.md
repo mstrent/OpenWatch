@@ -22,7 +22,8 @@ data as an ordinary app can actually reach.
 
 - **Phase: M1 (Pixel skin temperature) and M2 (install ergonomics) are done.** M1 verified on
   the watch 2026-11-27: skin rows land, the "Skin temp now" card reads, and the watch's toggle
-  works (Matt). Only the phone app's skin toggle appearing is unchecked.
+  works (Matt), and the phone app's "Skin temperature at night" switch appears for the Pixel
+  (no SpO2 switch) and drives the watch's setting both ways (2026-11-27 night). **M1 done.**
 - **The test watch is Workspace-only since 2026-11-27** (consumer account removed); the Health
   Services offer did not change. **Every no-root route to HRV, SpO2 and respiratory rate is
   now closed on the watch**, including the Samsung-style one (`heart_rate_extended`, re-checked
@@ -194,8 +195,7 @@ see the emulator design gate in the 2026-11-26 Lobe AI journal entry). **Current
 
 ## Next actions
 
-1. **Finish M1:** check that the phone app shows the skin toggle for the Pixel watch. (Watch side
-   verified 2026-11-27.) Strava/Zepp: Strava only reads workouts from Health Connect, so nothing
+1. ~~Finish M1~~ — done 2026-11-27 night (phone skin switch verified). Strava/Zepp: Strava only reads workouts from Health Connect, so nothing
    to see until a workout is recorded; Zepp not checked.
    Note: Google Health also writes the watch's steps/HR to Health Connect, so with both apps
    present Health Connect's app priority decides which counts (total did not double: 3,532).
@@ -329,7 +329,13 @@ Google Health. The existing Samsung paths for them stay untouched.
   probe runs but `run-as` cannot pull its file. (2) Reinstalling the app kills a running probe
   before its summary (first 5-min run lost its summary that way). (3) `wear-install.sh --probe`
   does not pass `--probe-seconds` to the activity (noted under setup; not fixed).
-- Gates: `verifyWearCi` passed (needs `ANDROID_HOME` exported on this machine). Watch left on the
+- **Phone skin switch verified (M1 done).** Matt could not find it: the phone's debug app was
+  installed 2026-11-26 12:36, before `487c90a` (15:08) added the Pixel gate. Updated it in place
+  (`adb install -r app/build/outputs/apk/debug/app-debug.apk`; pairing kept). The watch's card
+  then shows "Skin temperature at night" on, no SpO2 switch; flipping it off/on from the phone
+  set `skin_temperature` false/true in the watch's `wear_settings.xml` within seconds. Lesson:
+  after phone-side changes, reinstall the phone app before asking Matt to look.
+- Gates: `verifyCi verifyWearCi` and the wiki check passed (needs `ANDROID_HOME` exported on this machine). Watch left on the
   **debuggable** build (janky); reinstall the fast build when the survey is done. Remind Matt to
   turn Wireless debugging off.
 
