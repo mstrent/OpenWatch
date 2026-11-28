@@ -158,8 +158,15 @@ type ("MetricsMappings", 97 of them), not yet an app's `CapabilitiesClient` answ
   hold for this watch.
 - **Numeric types** (`65537`–`65549` passive, `131073`–`131078` per exercise) appear with no public
   name; the Fitbit app subscribes to the passive ones as `health_services.device_private.<n>`. These
-  are presumably where Google's own SpO2/HRV/skin-temperature pipelines live. Whether a
-  third-party app can subscribe to a `device_private` type, or is refused, is untested.
+  are presumably where Google's own SpO2/HRV/skin-temperature pipelines live. A third-party app
+  is refused them: `SecurityException: Missing permissions: [...OEM_OPAQUE_DATA_ACCESS]`
+  (signature|privileged), probe 2026-11-27.
+- **Not occupancy by the vendor apps** (2026-11-27): with `com.fitbit.FitbitMobile`,
+  `com.google.android.wearable.pixel.aspen` and `com.fitbit.ecg` disabled
+  (`pm disable-user`) and Health Services restarted, the passive table was byte-identical, the
+  app's capabilities unchanged, private ids still refused by permission, and HRV asked for by
+  name still "not supported by device passive monitoring capabilities". The table is the HAL's,
+  not a share left over after Fitbit.
 
 So Health Services fills the gaps OpenWatch has no raw route for (calories, distance, running
 dynamics, the vendor's step and floors pipeline, sleep detection), but not the vitals.

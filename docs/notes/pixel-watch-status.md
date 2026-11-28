@@ -302,6 +302,15 @@ Google Health. The existing Samsung paths for them stay untouched.
 
 ## Session journal (newest first)
 
+### 2026-11-27 (late afternoon) — Claude Code (session: vendor-app exclusivity test)
+- Watch on a new wireless-debugging address (it changes; use `adb mdns services`).
+- **Disabling Fitbit, Connected fitness (pixel.aspen) and Fitbit ECG changes nothing** for an
+  ordinary app: same HAL passive table, same 6 public types, private ids refused for
+  `OEM_OPAQUE_DATA_ACCESS`, vitals by name refused as unsupported. Re-enabled afterwards.
+  Details in the sensor map. Occupancy hypothesis closed.
+- Accounts on the watch: the Workspace account is primary (set up first); a consumer Gmail
+  account was added after it, so removing it should not force a reset.
+
 ### 2026-11-27 (afternoon) — Claude Code (session: settings listener bug; vitals blockers mapped)
 - **Bug fixed**: `WearGraph.settings` kept only `WearSettingsState(app).state`; SharedPreferences
   holds listeners weakly, so after a GC the watch's settings screen (and anything reading the
