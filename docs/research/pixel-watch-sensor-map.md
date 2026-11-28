@@ -274,6 +274,11 @@ ran unbroken, 36k lines). Raw captures hold GPS fixes during workouts: keep them
   contact (`Leads on: 1`) 4 s after start; sampling stopped 34 s later. **No rhythm result or
   sample values are logged** — classification happens in the ECG app (`ECGlib`, JNI), not the hub.
   Root would let a test app read the raw 250 Hz waveform from that sensor; nothing else would.
+- **Content providers (2026-11-27):** Health Services exports `…healthservices` (profile),
+  `…customconfiguration` (opaque tracker config) and `…bugreport`; each refuses an ordinary caller
+  and needs `READ_PROFILE_INFO` / `SET_OPAQUE_CONFIGURATION` / a GMS permission, the first two
+  `signature|privileged` like `OEM_OPAQUE_DATA_ACCESS`. Fitbit, Connected fitness and ECG export no
+  data providers. No unprotected side door found.
 
 ## What ordinary apps reach on Pixel Watch (reported, not verified here)
 
