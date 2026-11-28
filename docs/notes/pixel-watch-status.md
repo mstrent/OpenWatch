@@ -339,6 +339,12 @@ Google Health. The existing Samsung paths for them stay untouched.
 
 ## Session journal (newest first)
 
+### 2026-11-28 — Claude Code (session: advocacy, no code)
+- Helped Matt write a Reddit post on the Workspace lockout plus the sensor lockdown; he posted it
+  and cross-linked the Issue Tracker issues himself.
+- Issue Tracker survey (signed in via Chrome) recorded in the sensor map under "What is closed
+  to ordinary apps": open requests, three closed Infeasible, and GSR access withdrawn in Wear OS 6.
+
 ### 2026-11-28 (morning) — Claude Code (session: the night's report, M3)
 - `wear-debug-report.py` + the watch's `metrics.db` over the night (bedtime 22:00–07:55, synced
   hold all night, no wake lock). Details in the sensor map, "a night of wear".

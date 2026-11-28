@@ -336,10 +336,29 @@ outright), so a capability query at run time is the only safe design.
 The red/infrared SpO2 light, raw PPG and beat intervals, ECG electrodes and skin conductance have
 no open sensor path on Pixel Watch (verified for PPG, ECG and skin conductance by the capture
 above; skin temperature, once listed here, turned out to be open), the same as Samsung's `SSENSOR` gate on
-Galaxy. Google's own issue tracker has an open, unanswered request to expose beat intervals and
-raw PPG through Health Services. There is no third-party Binder route to Google's health stack
-either, unlike Samsung's platform: a Pixel metric that is gated at the sensor stays gated at the
-sensor.
+Galaxy. There is no third-party Binder route to Google's health stack either, unlike Samsung's
+platform: a Pixel metric that is gated at the sensor stays gated at the sensor.
+
+Google's Issue Tracker on this (searched signed in, 2026-11-28; anonymous fetches get a sign-in
+wall). The pattern: requests are left open without action, or closed as **Infeasible**, and access
+has been withdrawn as well as never granted.
+
+- Open: [568850686](https://issuetracker.google.com/issues/568850686) raw PPG/ECG/EDA via Health
+  Services (New); [484226247](https://issuetracker.google.com/issues/484226247) beat-to-beat RR/IBI
+  (New, Welltory's); [487128730](https://issuetracker.google.com/issues/487128730) RR/HRV in Health
+  Services, Pixel Watch 3/4 (Assigned).
+- Withdrawn: [521893570](https://issuetracker.google.com/issues/521893570) — Wear OS 6 removed
+  third-party access to the GSR sensor (65554) on Pixel Watch 3, breaking a University of Bath
+  research project; Assigned, no Google reply since 2026-06-22.
+- Closed Infeasible: [481590114](https://issuetracker.google.com/issues/481590114)
+  SpO2/ECG/skin temp missing from `MeasureClient`; [469370937](https://issuetracker.google.com/issues/469370937)
+  vendor PPG/ECG `SensorManager` access differs Pixel Watch 2 vs 4;
+  [458071622](https://issuetracker.google.com/issues/458071622) PPG and RR access.
+- Nothing on the tracker for Workspace accounts in Fitbit/Google Health. The old Fitbit Community
+  idea thread on it (`idi-p/5399468`) now 301s to the Google Health Community home, not migrated.
+
+On 2026-11-28 Matt cross-linked 568850686, 484226247 and 521893570 with this survey's findings
+and posted the story to Reddit.
 
 That sentence has a narrower reach than it used to. Raw light is not the only route to a number:
 Health Services is a documented route to the *processed* version of several of these metrics
