@@ -480,10 +480,15 @@ private fun WearOsWatchSettingsCard(
                 )
             }
             if (skinOfferedByWatch(settings)) {
+                val allDay = skinAllDayOnWatch(settings)
                 SwitchRow(
-                    title = stringResource(R.string.watch_settings_skin),
+                    title = stringResource(if (allDay) R.string.watch_settings_skin_all_day else R.string.watch_settings_skin),
                     body = stringResource(
-                        if (on(Preferences.SKIN_TEMPERATURE) && !on(Preferences.SKIN_GRANTED)) R.string.watch_settings_allow_on_watch else R.string.watch_settings_skin_explained,
+                        when {
+                            on(Preferences.SKIN_TEMPERATURE) && !on(Preferences.SKIN_GRANTED) -> R.string.watch_settings_allow_on_watch
+                            allDay -> R.string.watch_settings_skin_all_day_explained
+                            else -> R.string.watch_settings_skin_explained
+                        },
                     ),
                     checked = on(Preferences.SKIN_TEMPERATURE),
                     enabled = !busy,

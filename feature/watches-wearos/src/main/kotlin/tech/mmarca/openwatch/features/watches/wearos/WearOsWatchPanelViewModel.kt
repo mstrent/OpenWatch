@@ -89,6 +89,14 @@ data class WearOsWatchPanelUiState(
 internal fun skinOfferedByWatch(settings: Map<String, String>): Boolean =
     settings[Preferences.SAMSUNG_AVAILABLE] == Preferences.ON || settings[Preferences.SKIN_SENSOR] == Preferences.ON
 
+/**
+ * Whether the watch records skin temperature all day: a raw skin sensor (Pixel) without the Samsung
+ * platform, whose tracker runs only while sleep is held. The switch then says so; the nights still
+ * go to Health Connect, the rest stays on the watch.
+ */
+internal fun skinAllDayOnWatch(settings: Map<String, String>): Boolean =
+    settings[Preferences.SKIN_SENSOR] == Preferences.ON && settings[Preferences.SAMSUNG_AVAILABLE] != Preferences.ON
+
 /** Whether the watch offers night SpO2: the Samsung platform only, so no sensor token opens it. */
 internal fun spo2OfferedByWatch(settings: Map<String, String>): Boolean =
     settings[Preferences.SAMSUNG_AVAILABLE] == Preferences.ON

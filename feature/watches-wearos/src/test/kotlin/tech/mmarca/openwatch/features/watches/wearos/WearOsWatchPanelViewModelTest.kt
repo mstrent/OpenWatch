@@ -181,6 +181,15 @@ class WearOsWatchPanelViewModelTest {
     }
 
     @Test
+    fun `a watch with only the raw skin sensor records skin all day, the Samsung platform at night`() {
+        assertEquals(true, skinAllDayOnWatch(mapOf(Preferences.SKIN_SENSOR to Preferences.ON)))
+        // The Samsung platform's tracker runs only in a sleep hold, whatever else the watch reports.
+        assertEquals(false, skinAllDayOnWatch(mapOf(Preferences.SAMSUNG_AVAILABLE to Preferences.ON, Preferences.SKIN_SENSOR to Preferences.ON)))
+        assertEquals(false, skinAllDayOnWatch(mapOf(Preferences.SAMSUNG_AVAILABLE to Preferences.ON)))
+        assertEquals(false, skinAllDayOnWatch(emptyMap()))
+    }
+
+    @Test
     fun `the skin temperature line is kept back when the watch says the measurement is off`() {
         val forming = WearOsWatchPanelUiState(skinNightsToBaseline = 2)
 
