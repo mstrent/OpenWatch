@@ -98,4 +98,9 @@ class WearMetricsTest {
         assertFalse(WearMetrics.SKIN_TEMPERATURE_DAY.key in WearMetrics.ALL.map { it.key })
         assertTrue(WearMetrics.SKIN_TEMPERATURE.retentionMillis >= 31L * 24 * 60 * 60 * 1000)
     }
+
+    @Test
+    fun `the day skin series keeps the week the skin now card charts`() {
+        assertTrue(WearMetrics.SKIN_TEMPERATURE_DAY.retentionMillis >= WearMetric.WEEK_MILLIS)
+    }
 }

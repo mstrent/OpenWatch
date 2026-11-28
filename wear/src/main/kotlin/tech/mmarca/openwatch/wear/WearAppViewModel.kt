@@ -33,7 +33,7 @@ class WearAppViewModel(application: Application) : AndroidViewModel(application)
 
     private val graph = application.wearGraph
 
-    private val readings = WearReadingsSource(graph.store, waterGoalMl = DisplayPreferences.DEFAULT_WATER_GOAL_ML.toDouble())
+    private val readings = WearReadingsSource(graph.store, waterGoalMl = DisplayPreferences.DEFAULT_WATER_GOAL_ML.toDouble(), skinAllDay = graph.skinAllDay)
 
     /** The settings as they change. The first read loads their file: collected off the main thread. */
     private val settings = flow { emitAll(graph.settings) }.flowOn(Dispatchers.IO)

@@ -147,7 +147,9 @@ object WearMetrics {
         decode = WearLinkProtocol::parseSkinMinute,
         timeOf = { it.epochMillis },
         onSameTime = WearMetric.OnSameTime.REPLACE,
-        retentionMillis = 2L * 24 * 60 * 60 * 1000,
+        // A week, as the "Skin temp now" card charts it: a shorter keep would leave the older
+        // bars with only their held night minutes, a different average from the all-day ones.
+        retentionMillis = WearMetric.WEEK_MILLIS + 24L * 60 * 60 * 1000,
     )
 
     /** One SpO2 spot measurement at night from the Samsung platform; see `Spo2Recorder`. Final once taken. */

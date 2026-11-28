@@ -612,4 +612,12 @@ class WearReadingsTest {
         assertNull(state.current)
         assertEquals(listOf(33.0), state.today)
     }
+
+    @Test
+    fun `skin temperature now stays on the dashboard with the week when today has no minute yet`() {
+        val yesterday = day(today.minusDays(1), skin = listOf(SkinMinute(at(today.minusDays(1), 20, 0), 3300, 2300)))
+        val state = WearReadings.metrics(week(day(today), mapOf(1 to yesterday)), now, zone).getValue(MetricTile.SKIN_TEMPERATURE_NOW)
+        assertNull(state.current)
+        assertEquals(33.0, state.week.last { it != null }!!, 1e-9)
+    }
 }

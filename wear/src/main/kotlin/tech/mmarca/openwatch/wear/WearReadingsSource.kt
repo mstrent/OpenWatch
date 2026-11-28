@@ -41,6 +41,8 @@ internal class WearReadingsSource(
     private val clock: Clock = Clock.systemDefaultZone(),
     /** The water tile's goal, millilitres. */
     private val waterGoalMl: Double = DisplayPreferences.DEFAULT_WATER_GOAL_ML.toDouble(),
+    /** Whether the watch records skin temperature all day (Pixel's raw sensor); only then is there a skin "now". */
+    private val skinAllDay: Boolean = true,
 ) {
     private val pastDays = HashMap<LocalDate, DayReadings>()
 
@@ -122,8 +124,13 @@ internal class WearReadingsSource(
             night = night(WearReadings.nightWindow(date, zone)),
             zoneBasis = zoneBasis,
             // The held night's minutes and the watch-only day's: the skin "now" and its line are both.
-            skin = (store.since(WearMetrics.SKIN_TEMPERATURE, from, ROW_LIMIT, until) +
-                store.since(WearMetrics.SKIN_TEMPERATURE_DAY, from, ROW_LIMIT, until)).sortedBy { it.epochMillis },
+            // A night-only source (Samsung's) has no "now": its held minutes stay the night's card.
+            skin = if (!skinAllDay) {
+                emptyList()
+            } else {
+                (store.since(WearMetrics.SKIN_TEMPERATURE, from, ROW_LIMIT, until) +
+                    store.since(WearMetrics.SKIN_TEMPERATURE_DAY, from, ROW_LIMIT, until)).sortedBy { it.epochMillis }
+            },
         )
     }
 

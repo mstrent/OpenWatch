@@ -299,12 +299,13 @@ internal object WearReadings {
                     ),
                 )
             }
-            today.latestSkin?.let { latest ->
+            if (days.any { it.skinStats != null }) {
+                val latest = today.latestSkin
                 put(
                     MetricTile.SKIN_TEMPERATURE_NOW,
                     MetricUiState(
                         // An old minute is not "now": the card says there is no reading rather than show it.
-                        current = latest.skinCelsius.takeIf { now.toEpochMilli() - latest.epochMillis <= SKIN_NOW_FRESH_MILLIS },
+                        current = latest?.takeIf { now.toEpochMilli() - it.epochMillis <= SKIN_NOW_FRESH_MILLIS }?.skinCelsius,
                         today = today.skinLine.flatten().map { it.value },
                         line = today.skinLine,
                         week = days.dropWhile { it.skinStats == null }.map { it.skinStats?.average },

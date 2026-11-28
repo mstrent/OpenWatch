@@ -351,4 +351,13 @@ class WearReadingsSourceTest {
         assertEquals(34.0, state.current!!, 1e-9)
         assertEquals(listOf(33.0, 34.0), state.today)
     }
+
+    @Test
+    fun `a watch that records skin temperature only at night has no skin temperature now card`() {
+        store.putAll(WearMetrics.SKIN_TEMPERATURE, listOf(SkinMinute(at("06:00:00"), 3300, 2300)))
+
+        val metrics = WearReadingsSource(store, Clock.fixed(now, ZoneOffset.UTC), skinAllDay = false).load()
+
+        assertFalse(MetricTile.SKIN_TEMPERATURE_NOW in metrics)
+    }
 }
