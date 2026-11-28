@@ -302,6 +302,50 @@ Google Health. The existing Samsung paths for them stay untouched.
 
 ## Session journal (newest first)
 
+### 2026-11-27 (evening) — Claude Code (session: Samsung-clue analysis; root decision pending)
+**All non-root hypotheses for the Pixel vitals are now closed on the real watch; one reachable
+sensor remains unprobed; root is the next step and needs Matt's hands.**
+
+- **Vendor-app occupancy: ruled out.** Disabling `com.fitbit.FitbitMobile`,
+  `com.google.android.wearable.pixel.aspen` and `com.fitbit.ecg` (`pm disable-user`) and
+  restarting Health Services left the passive table byte-identical, capabilities unchanged,
+  private ids still refused, HRV-by-name still "not supported". Re-enabled. (commit `1aa5b4f`)
+- **Consumer account: ruled out.** Matt removed the consumer Gmail account and rebooted
+  (Workspace-only watch now). Same table, same refusals. A stale `clockwork.accounts` record
+  of it lingers. (commit `6f06d92`)
+- **What the repo's other-watch support teaches (analysis, no code):** the `wear/.../samsung/`
+  package is a clean-room Binder client for `com.samsung.android.service.health` that gets HR+IBI,
+  SpO2 and skin temp with no SDK and no root (`docs/engineering/samsung-health-and-privacy.md`).
+  Two lessons: (1) talk to the system health service directly over Binder — but this does NOT
+  port to the Pixel, whose private Health Services types are gated by `OEM_OPAQUE_DATA_ACCESS`
+  (signature|privileged), checked by the framework, not the service; a clean-room client cannot
+  satisfy it. (2) Samsung's *default* HRV source is not the IBI service but `PpgWindowSource`
+  reading raw PPG (`com.samsung.sensor.hr_raw`, 25 Hz) via plain `SensorManager` under the
+  ordinary HR permission, fed to the device-agnostic pipeline `PpgBeats -> HrvRmssd -> NightHrv`.
+- **The one no-root lead left, reachable NOW (no wipe):**
+  `com.google.sensor.heart_rate_extended` (131086), gated by `health.READ_HEART_RATE` — a grant
+  the app already holds. Payload undocumented. If it carries beat intervals / confidence / a
+  waveform, the existing HRV pipeline consumes it and HRV needs no root. **Not yet probed**
+  (would need a small debug-only `SensorManager` listener on type 131086 in `wear/src/debug/`).
+  `com.google.sensor.skin_temperature` (65555) open (already used). Raw PPG (65572), PPG
+  controller (65549), ECG, GSR all `READ_PRIVATE_SENSORS` (signature) — unreachable without
+  root or privileged signing. **No SpO2 and no respiratory sensor type exist on the raw path**;
+  those live only inside Google's private streams.
+- **Root (research only, not kept — Matt's standing decision):** I cannot do it from here. A
+  Pixel Watch 5 on a `user` build needs a physical bootloader unlock (wipes the watch) then
+  fastboot-flashing a Magisk-patched boot image. Once rooted, the research targets are: dump the
+  private PPG/GSR/skin/ECG sensor payloads; decode the private Health Services ids 65537-65549;
+  trace how `pixel.aspen`/Fitbit read them; pull the sensor HAL. Even with root, an *ordinary*
+  app still cannot read the private types — root tells us what we're missing and whether any
+  no-root shadow (like 131086) carries the same data.
+- **DECISION PENDING for next session:** probe 131086 first (no wipe; may yield HRV) vs. root
+  now (wipe; only route to SpO2/private streams) vs. both in parallel. I recommend probing 131086
+  first — cheap, reversible, and it is the direct application of the Samsung lesson.
+- **Watch state:** fast build reinstalled and confirmed NOT debuggable (so `run-as` probes need
+  the debug build reinstalled first: `OPENWATCH_PUBLISHED_DEBUG_APK=true ./gradlew :wear:assembleDebug`
+  then `scripts/wear-install.sh --serial <w>`). Wireless-debugging address changes on reboot
+  (`adb mdns services`); remind Matt to turn Wireless debugging off when done.
+
 ### 2026-11-27 (late afternoon) — Claude Code (session: vendor-app exclusivity test)
 - Watch on a new wireless-debugging address (it changes; use `adb mdns services`).
 - **Disabling Fitbit, Connected fitness (pixel.aspen) and Fitbit ECG changes nothing** for an
