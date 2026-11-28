@@ -145,7 +145,10 @@ internal class WearGraph(private val app: Application) {
             isHeartRateRecording = { heartRate.isDense },
             stepsInMinute = ::stepsInMinute,
             // The heart rate runs at full rate while sleep is held; the plan reads it.
-            onSleepHoldChange = { tellHost { replan() } },
+            onSleepHoldChange = { holding ->
+                skinHolds.onHoldChange(holding, System.currentTimeMillis())
+                tellHost { replan() }
+            },
             wakeSync = wakeSync,
             syncedHold = { heartRate.isDense && WearSettings.syncedSleepHold(app) },
         )
@@ -166,8 +169,11 @@ internal class WearGraph(private val app: Application) {
         )
     }
 
+    /** When sleep was held, for the skin recorder to route each minute by its own time. */
+    private val skinHolds = SkinHoldWindows()
+
     val skinTemperature: SkinTemperatureRecorder by lazy {
-        SkinTemperatureRecorder(store, skinSource, debug, isSleepHolding = { sleepMinutes.isSleepHolding })
+        SkinTemperatureRecorder(store, skinSource, debug, nightOnly = !skinAllDay, holds = skinHolds)
     }
 
     /** Pixel's raw skin sensor records all day on the wrist; the Samsung tracker only in a sleep hold. */
@@ -329,7 +335,8 @@ internal class WearGraph(private val app: Application) {
         samsung = samsungFeed.isAvailable,
         skinGranted = WearPermissions.hasSkinTemperature(app),
         spo2Granted = WearPermissions.hasOxygenSaturation(app),
-        skinSensor = skinSource.isAvailable,
+        // The raw sensor only: on a Samsung watch the platform tracker is the source, and `samsung` says so.
+        skinSensor = skinAllDay,
     )
 
     /** A setting the phone changed: stored, and the running service follows. Link thread. */

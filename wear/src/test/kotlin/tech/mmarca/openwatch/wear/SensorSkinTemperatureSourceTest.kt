@@ -21,4 +21,13 @@ class SensorSkinTemperatureSourceTest {
         assertTrue(SensorSkinTemperatureSource.isMeasuredSkinPoint(SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM))
         assertTrue(SensorSkinTemperatureSource.isMeasuredSkinPoint(SensorManager.SENSOR_STATUS_ACCURACY_HIGH))
     }
+
+    @Test
+    fun `only a reading from well before the listener registered is the cached one`() {
+        val registered = 1_794_100_020_000L
+        assertTrue(SensorSkinTemperatureSource.isCachedReading(registered - 10 * 60_000, registered))
+        assertFalse(SensorSkinTemperatureSource.isCachedReading(registered - 10_000, registered))
+        // A FIFO point delivered late, but taken after registering, is kept however old it is now.
+        assertFalse(SensorSkinTemperatureSource.isCachedReading(registered + 60_000, registered))
+    }
 }

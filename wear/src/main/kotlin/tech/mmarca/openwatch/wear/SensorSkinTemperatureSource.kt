@@ -21,8 +21,8 @@ import android.os.Handler
  * carries a single channel: skin, no ambient, so [SkinReading.ambientCelsius]
  * is NaN for every point. [SkinTemperatureRecorder] knows the channel is
  * absent and stamps a placeholder ambient only for the wire. Non-wake-up and
- * unbatched is fine: the night's sleep hold already keeps the CPU awake, and
- * the sensor's own cadence asks for nothing more.
+ * unbatched: recording all day, it must not wake the processor; its points
+ * wait in the FIFO for the next wake-up and keep their own times.
  */
 internal class SensorSkinTemperatureSource(
     private val context: Context,
@@ -34,12 +34,16 @@ internal class SensorSkinTemperatureSource(
     /** Set by [start], cleared by [stop]. */
     private var sink: SpotSource.Sink<SkinReading>? = null
 
+    /** When [start] registered the listener. */
+    private var registeredAtMillis = 0L
+
     override val isAvailable: Boolean
         get() = skinSensor() != null
 
     override fun start(handler: Handler, sink: SpotSource.Sink<SkinReading>): Boolean {
         val found = skinSensor() ?: return false
         this.sink = sink
+        registeredAtMillis = System.currentTimeMillis()
         val registered = try {
             sensorManager.registerListener(this, found, SAMPLING, 0, handler)
                 .also { if (it) debug.registered("skinTemperature", found, SAMPLING, 0) }
@@ -66,8 +70,10 @@ internal class SensorSkinTemperatureSource(
         if (event.sensor.stringType != SKIN_SENSOR_TYPE) return
         val target = sink ?: return
         val at = SensorTime.epochMillisOf(event.timestamp)
-        // The cached reading handed to a new listener carries the time the sensor last ran.
-        if (SensorTime.isStale(at)) return
+        // The cached reading handed to a new listener carries the time the sensor last ran. Only
+        // that one is dropped: a point that waited in the FIFO for a wake-up, even for ten minutes
+        // under power-save heart rate, was taken after registering and is kept.
+        if (isCachedReading(at, registeredAtMillis)) return
         // NaN ambient, not a placeholder: the recorder owns the missing-ambient policy.
         target.onReadings(listOf(SkinReading(at, event.values[0], Float.NaN, isMeasuredSkinPoint(event.accuracy))))
     }
@@ -95,6 +101,13 @@ internal class SensorSkinTemperatureSource(
          * tests hold — the accuracy threshold is the sensor contract's only
          * branch, everything else needs a real watch.
          */
+        /** A reading older than this before registering is the sensor's cached one; younger is as good as current. */
+        private const val CACHED_MARGIN_MILLIS = 30_000L
+
+        /** Whether a point taken at [eventAtMillis] is the cached reading a listener registered at [registeredAtMillis] is first handed. */
+        internal fun isCachedReading(eventAtMillis: Long, registeredAtMillis: Long): Boolean =
+            eventAtMillis < registeredAtMillis - CACHED_MARGIN_MILLIS
+
         internal fun isMeasuredSkinPoint(accuracy: Int): Boolean =
             accuracy >= SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM
     }
