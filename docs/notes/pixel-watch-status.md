@@ -351,7 +351,8 @@ Google Health. The existing Samsung paths for them stay untouched.
   rows in Health Connect. Then PR 3.
 - Watch still has the debuggable build.
 - **Phone side (adb on the phone):** sleep written to Health Connect, one night 23:42–07:24
-  (430 min asleep, 32 awake, window by angle) — Matt to confirm the times. Skin night rows
+  (430 min asleep, 32 awake, window by angle) — **Matt: about right.** His bedtime mode is a
+  22:00 schedule for quiet notifications, not when he sleeps; the estimate found the real night. Skin night rows
   reached the phone (night median 33.41 °C from 78 minutes); no Health Connect skin record yet,
   by design: upstream's baseline needs 3 other nights first.
 - **Found a PR 3 blocker:** the Pixel skin sensor is on-change at ~0.2 °C steps, so on a steady
