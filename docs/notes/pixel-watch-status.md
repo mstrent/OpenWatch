@@ -203,6 +203,8 @@ see the emulator design gate in the 2026-11-26 Lobe AI journal entry). **Current
    (2026-11-27 night). Decide: root the test watch for research only (bootloader unlock wipes
    it; even then an ordinary app cannot read the private types, so it would not ship to the
    family) — or stop here and put the effort into M3/M4. Recommended: stop.
+   Cheaper research step first (no wipe): an overnight vendor-log capture (2026-11-27 late
+   evening journal); the vendor log already names the private types.
 3. The development plan below: M1 and M2 done. Matt's OK per milestone gates what follows:
    **M3** (narrowed to the doze accelerometer gap, ~60 % whole; matters for sleep) and **M4**
    (Health Services source for calories/distance/floors — first re-check their delivery on the
@@ -309,6 +311,19 @@ Google Health. The existing Samsung paths for them stay untouched.
   permission ≠ network permission, but check what a dependency drags in).
 
 ## Session journal (newest first)
+
+### 2026-11-27 (late evening) — Claude Code (session: vendor log capture)
+- Matt turned on **OEM unlocking** (no effect by itself: `ro.boot.flash.locked=1`, verified boot
+  green, `user` build, `adb root` refused) and **verbose vendor logging** (useful: the hub firmware
+  and Health Services HAL now log to logcat, readable by adb without root).
+- Streamed ~9 min of `logcat -b all` worn (rest, walk, Fitbit Exercise walk, rest). Findings in the
+  sensor map ("what the vendor log shows"): the private passive types are AZM, CARDIO_LOAD and
+  **FITBIT_SITE** — a bundle of hub records (HRM, EDA_CONT_MINUTE, MSA_MINUTE, SLEEP_300S,
+  SLEEP_STAGES, GROK); **no SpO2/HRV/respiratory type name anywhere**. Research only — no app route.
+- Open question for root/fastboot: how a Pixel Watch 5 reaches fastboot at all (no USB data port
+  on earlier Pixel watches; they needed a debug dock). Do not `adb reboot bootloader` until known.
+- Next, if wanted: an **overnight log capture** (Wireless debugging on, watch worn to bed) to see
+  whether night vitals show up as records, sensors (red/IR PPG) or values.
 
 ### 2026-11-27 (night) — Claude Code (session: heart_rate_extended full-rate re-check; docs corrected)
 **The Samsung-style HRV lead is closed on Pixel; no no-root route to HRV/SpO2/respiratory remains.**

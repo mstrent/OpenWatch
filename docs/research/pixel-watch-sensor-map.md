@@ -229,6 +229,41 @@ consumer account):
   sleep estimate (Q8); not yet explained (non-wake sensor, FIFO not overflowing on paper).
 - Skin tracker 0 events: the watch was still running the pre-M1 build (installed 09:22).
 
+## Verified: what the vendor log shows (2026-11-27 evening, adb only)
+
+With **Developer options > "Enable verbose vendor logging"** on, `adb logcat -b all` (shell user,
+no root) carries the sensor hub firmware's own log (tag `MCU`) and the Health Services HAL's
+(`WHSHAL`). Captured ~9 min worn: rest, walking, a Fitbit Exercise "Walk" workout, rest. This is
+**research only**: no app can read another process's log, so nothing here is a data route.
+The hub is chatty; its lines last about a minute in the on-watch buffer, so stream
+`adb logcat -b all -v threadtime > file` while the activity happens. Wireless streams can stall
+when the watch dozes. Raw captures hold GPS fixes during workouts: keep them out of the repo.
+
+- **The private passive types are named.** Health Services tracks, for Fitbit,
+  `PASSIVE_STEP_COUNT PASSIVE_DISTANCE PASSIVE_ALL_CALORIES PASSIVE_FLOORS` plus
+  `OEM_METRIC_DATA_TYPE_AZM_PASSIVE` (Active Zone Minutes), `OEM_METRIC_DATA_TYPE_FITBIT_SITE` and
+  `OEM_METRIC_DATA_TYPE_CARDIO_LOAD_PASSIVE`. In a workout it adds `…_AZM_ACTIVE`, `…_AVG_PACE`,
+  `…_LOCATION`, `…_HEART_RATE_ZONES`, `…_CARDIO_LOAD_ACTIVE`, carried as
+  `device_private.131073–131076/131078` (byte arrays, format 5). Which numeric id is which name is
+  not yet mapped. **No SpO2, HRV or respiratory type name appears at all.**
+- **`FITBIT_SITE` is a bundle of hub records** (`[SiteDataProvider] Flushing n <TYPE> records`):
+  `HRM`, `EDA_CONT_MINUTE` (continuous electrodermal activity), `MSA_MINUTE`, `SLEEP_300S`,
+  `SLEEP_STAGES`, `GROK`. Working hypothesis, unverified: the night vitals are computed from
+  these records by Fitbit's app or cloud, not delivered as their own types — which would explain
+  why no vitals type name shows. An overnight capture is the test.
+- **The hub's sensors, by name** (USF start/stop requests): HeartRate, Skin temperature sensor,
+  Accelerometer, Gyroscope, Magnetometer, Gravity, Ambient Light, Instant Motion, Stationary,
+  TiltToWake, Glanceable State, **Continuous EDA**. Raw PPG is not a USF client sensor; it is
+  driven inside the hub (`AfeTiPpg…`, `[Salus]`, `[Heartrate]`).
+- **PPG front end**: all-day op mode 110 switches to 103 for a workout (14 channels, 10 for heart
+  rate, green LED, 100 mA supply / 50 mA full scale); continuous EDA is paused for the workout and
+  resumed after. `[Salus]` adjusts LED current and logs "skip final decision result in ppg
+  cooldown period" every few minutes (some periodic PPG-based decision; which feature is unknown).
+- **Values that do appear**: hub heart rate with a confidence (`Heart Rate: 76.0, Confidence: 4`),
+  sleep classification every 30 s, passive calories/distance/steps, workout pace/distance/calories,
+  activity-recognition features as hex. Nothing for SpO2, HRV, respiratory rate or EDA values.
+- ECG could not be run: the ECG app needs a signed-in Google Health account.
+
 ## What ordinary apps reach on Pixel Watch (reported, not verified here)
 
 Through the raw sensor door:
