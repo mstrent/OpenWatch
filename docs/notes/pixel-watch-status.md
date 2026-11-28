@@ -310,6 +310,11 @@ Google Health. The existing Samsung paths for them stay untouched.
   Details in the sensor map. Occupancy hypothesis closed.
 - Accounts on the watch: the Workspace account is primary (set up first); a consumer Gmail
   account was added after it, so removing it should not force a reset.
+- **Removing the consumer account (and rebooting) changes nothing either**: same table, same
+  refusals, Workspace-only watch now. A stale `clockwork.accounts` record of the consumer account
+  remains. With this, both the occupancy and the account hypotheses are closed; what is left for
+  the vitals is root/priv-app (debug/RE only) to read the private ids' formats.
+- Fast build reinstalled (not debuggable; `run-as` probes need the debug build again).
 
 ### 2026-11-27 (afternoon) — Claude Code (session: settings listener bug; vitals blockers mapped)
 - **Bug fixed**: `WearGraph.settings` kept only `WearSettingsState(app).state`; SharedPreferences

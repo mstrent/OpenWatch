@@ -166,7 +166,8 @@ type ("MetricsMappings", 97 of them), not yet an app's `CapabilitiesClient` answ
   (`pm disable-user`) and Health Services restarted, the passive table was byte-identical, the
   app's capabilities unchanged, private ids still refused by permission, and HRV asked for by
   name still "not supported by device passive monitoring capabilities". The table is the HAL's,
-  not a share left over after Fitbit.
+  not a share left over after Fitbit. Same again with the consumer Gmail account removed from
+  the watch and a reboot (Workspace account only), 2026-11-27.
 
 So Health Services fills the gaps OpenWatch has no raw route for (calories, distance, running
 dynamics, the vendor's step and floors pipeline, sleep detection), but not the vitals.
