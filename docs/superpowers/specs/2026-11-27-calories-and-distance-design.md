@@ -58,8 +58,9 @@ Health without any setting (Matt: "ideally it'd coexist without needing toggles"
   active calories counted inside a total and again on top of it.
 - **A network permission on the watch** (the no-`INTERNET` invariant; Health Services client
   1.1.0 adds none — re-check the merged manifest).
-- **Silent wrong calories** from a profile the wearer never set (e.g. Health Services' default
-  profile on a watch without Fitbit). Wrong-but-plausible is worse than absent.
+- **Silent wrong calories** from a profile the wearer never set. Wrong-but-plausible is worse than
+  absent. (Health Services uses the watch's Health Profile — see Open 1 — so this becomes a setup
+  step, not a code path.)
 
 ## Approaches considered
 
@@ -135,11 +136,17 @@ Health without any setting (Matt: "ideally it'd coexist without needing toggles"
 
 ## Open — verify early in the build
 
-1. **Where Health Services gets the wearer's profile on a watch without Fitbit.** If it uses a
-   default profile, its total calories are wrong for that wearer (anti-goal 3). Check by comparing
-   its resting-minute burn against Mifflin-St Jeor for Matt's profile, and look for a way the app
-   can see or set the profile (`READ_PROFILE_INFO` is signature-gated). If it cannot be trusted,
-   use Health Services for **distance only** and the estimate for calories.
+1. ~~Where Health Services gets the wearer's profile~~ — **answered 2026-11-27**: from the watch's
+   own **Settings > Health Profile** (stored in Health Services' `ProfileContentProvider`; written
+   by Settings, which runs as system, and by Fitbit, the only other holder of
+   `WRITE_PROFILE_INFO`). Verified on Matt's watch: raising the weight ~20 kg raised the resting
+   burn from 1.084 to 1.244 kcal/min; restoring 150 lb restored 1.084 (probes
+   `probe-20261127-190838`, `-191345`). So Health Services' calories are right **if the wearer
+   fills in Health Profile on the watch**. OpenWatch cannot read that profile
+   (`READ_PROFILE_INFO` is signature|privileged), so the two profiles (watch Health Profile for
+   Health Services, OpenWatch's own body profile for the estimate) can disagree. Decision for the
+   build: keep Health Services as the calories source where offered; the setup docs / onboarding
+   tell family members to fill in Health Profile on the watch.
 2. **Health Connect's total-calories aggregate**: confirm whether it already derives a total from
    active + basal records when no total records exist; if so, write `BasalMetabolicRateRecord`
    instead of per-minute totals on the estimate path to avoid double counting.

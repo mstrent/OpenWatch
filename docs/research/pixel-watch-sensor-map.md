@@ -280,6 +280,15 @@ ran unbroken, 36k lines). Raw captures hold GPS fixes during workouts: keep them
   `signature|privileged` like `OEM_OPAQUE_DATA_ACCESS`. Fitbit, Connected fitness and ECG export no
   data providers. No unprotected side door found.
 
+## Verified: Health Services' calories follow the watch's Health Profile (2026-11-27)
+
+Settings > Health Profile is Health Services' own profile (`…healthservices.profile.ProfileContentProvider`,
+read/write `signature|privileged`; holders: Settings as system uid, Fitbit for write). It is not
+Google Health's. On Matt's Pixel Watch 5, passive `Calories` while still: 1.084 kcal/min at 150 lb;
+1.244 after raising the weight ~20 kg; 1.084 again once restored (~11.5 kcal/day per kg). An
+ordinary app cannot read the profile, but a wearer who fills it in gets Health Services calories
+for their own body, no account needed.
+
 ## What ordinary apps reach on Pixel Watch (reported, not verified here)
 
 Through the raw sensor door:
