@@ -236,8 +236,8 @@ no root) carries the sensor hub firmware's own log (tag `MCU`) and the Health Se
 (`WHSHAL`). Captured ~9 min worn: rest, walking, a Fitbit Exercise "Walk" workout, rest. This is
 **research only**: no app can read another process's log, so nothing here is a data route.
 The hub is chatty; its lines last about a minute in the on-watch buffer, so stream
-`adb logcat -b all -v threadtime > file` while the activity happens. Wireless streams can stall
-when the watch dozes. Raw captures hold GPS fixes during workouts: keep them out of the repo.
+`adb logcat -b all -v threadtime > file` while the activity happens (an 11-min wireless stream
+ran unbroken, 36k lines). Raw captures hold GPS fixes during workouts: keep them out of the repo.
 
 - **The private passive types are named.** Health Services tracks, for Fitbit,
   `PASSIVE_STEP_COUNT PASSIVE_DISTANCE PASSIVE_ALL_CALORIES PASSIVE_FLOORS` plus
