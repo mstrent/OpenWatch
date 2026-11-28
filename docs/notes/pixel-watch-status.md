@@ -350,6 +350,16 @@ Google Health. The existing Samsung paths for them stay untouched.
   outside it (159). Still to check on the phone: last night's sleep estimate, and the night skin
   rows in Health Connect. Then PR 3.
 - Watch still has the debuggable build.
+- **Phone side (adb on the phone):** sleep written to Health Connect, one night 23:42–07:24
+  (430 min asleep, 32 awake, window by angle) — Matt to confirm the times. Skin night rows
+  reached the phone (night median 33.41 °C from 78 minutes); no Health Connect skin record yet,
+  by design: upstream's baseline needs 3 other nights first.
+- **Found a PR 3 blocker:** the Pixel skin sensor is on-change at ~0.2 °C steps, so on a steady
+  night it is silent for up to 50 min (values either side of every gap differ by one step).
+  The phone's rules (`WearOsSkinTemperatureImport`: MAX_GAP 30 min, SETTLE 30 min) read that
+  as the watch coming off: the night split into 3 runs and one closed early. The minute median is
+  also over change-minutes, not time. Proposed fix (awaiting Matt): on the watch, repeat the last
+  value each worn minute (sample-and-hold), so the phone's rules and Samsung's path stay as they are.
 
 ### 2026-11-27 (night, 2) — Claude Code (session: review + first upstream PR)
 - **Upstream PR opened: [Hale-MTU/OpenWatch#96](https://github.com/Hale-MTU/OpenWatch/pull/96)**
