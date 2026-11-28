@@ -48,7 +48,9 @@ import java.util.Locale
  *    HRV, respiratory rate, skin temperature, SpO2, VO2 max and blood pressure) is delivered.
  *
  * Every line goes to `files/debug/probe-<time>.jsonl`, pulled with `run-as`. It writes nothing
- * else and stops itself. Start it with an optional `--ei seconds <n>` (default 90).
+ * else and stops itself. Start it with an optional `--ei seconds <n>` (default 90) and
+ * `--ez fastest true` (raw sensors at their fastest rate; a per-slot summary of every event is
+ * written at the end either way).
  */
 class HealthProbeActivity : ComponentActivity() {
 
@@ -221,12 +223,18 @@ class HealthProbeActivity : ComponentActivity() {
             "com.google.sensor.heart_rate_extended", "com.google.sensor.skin_temperature",
             "com.google.sensor.step_cadence", Sensor.STRING_TYPE_HEART_RATE,
         )
+        // `--ez fastest true` asks for each sensor's fastest rate instead of SENSOR_DELAY_NORMAL, so
+        // fields a vendor fills only at full rate are not missed.
+        val delay = if (intent.getBooleanExtra("fastest", false)) SensorManager.SENSOR_DELAY_FASTEST else SensorManager.SENSOR_DELAY_NORMAL
         val listeners = mutableListOf<SensorEventListener>()
+        val summaries = mutableListOf<() -> Unit>()
         manager.getSensorList(Sensor.TYPE_ALL).filter { it.stringType in wanted && !it.isWakeUpSensor }.forEach { sensor ->
             var count = 0
+            val stats = ValueStats()
             val listener = object : SensorEventListener {
                 override fun onSensorChanged(event: SensorEvent) {
                     count++
+                    stats.add(event.timestamp, event.values)
                     if (count <= MAX_EVENTS_LOGGED) {
                         emit("sensor.event") {
                             put("type", sensor.stringType); put("n", count); put("accuracy", event.accuracy)
@@ -237,15 +245,57 @@ class HealthProbeActivity : ComponentActivity() {
                 override fun onAccuracyChanged(s: Sensor, accuracy: Int) =
                     emit("sensor.accuracy") { put("type", sensor.stringType); put("accuracy", accuracy) }
             }
-            val ok = manager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_NORMAL)
+            val ok = manager.registerListener(listener, sensor, delay)
             emit("sensor.register") {
                 put("type", sensor.stringType); put("name", sensor.name); put("ok", ok)
+                put("delay", delay); put("minDelayUs", sensor.minDelay)
                 put("maxRange", sensor.maximumRange.toDouble()); put("resolution", sensor.resolution.toDouble())
                 put("reportingMode", sensor.reportingMode)
             }
-            if (ok) listeners += listener
+            if (ok) {
+                listeners += listener
+                summaries += { emit("sensor.summary") { put("type", sensor.stringType); put("events", count); stats.into(this) } }
+            }
         }
-        return { listeners.forEach(manager::unregisterListener) }
+        return {
+            listeners.forEach(manager::unregisterListener)
+            summaries.forEach { it() }
+        }
+    }
+
+    /**
+     * Every event's values, summed up per array slot, so a slot that is non-zero only now and then
+     * shows up past the logged events: min, max, how often non-zero, distinct values (capped).
+     */
+    private class ValueStats {
+        private var size = 0
+        private val min = DoubleArray(MAX_SLOTS) { Double.POSITIVE_INFINITY }
+        private val max = DoubleArray(MAX_SLOTS) { Double.NEGATIVE_INFINITY }
+        private val nonZero = IntArray(MAX_SLOTS)
+        private val distinct = Array(MAX_SLOTS) { HashSet<Float>() }
+        private var firstNs = 0L
+        private var lastNs = 0L
+
+        fun add(timestampNs: Long, values: FloatArray) {
+            if (firstNs == 0L) firstNs = timestampNs
+            lastNs = timestampNs
+            size = maxOf(size, values.size.coerceAtMost(MAX_SLOTS))
+            for (i in 0 until values.size.coerceAtMost(MAX_SLOTS)) {
+                val v = values[i].toDouble()
+                if (v < min[i]) min[i] = v
+                if (v > max[i]) max[i] = v
+                if (v != 0.0) nonZero[i]++
+                if (distinct[i].size < MAX_DISTINCT) distinct[i] += values[i]
+            }
+        }
+
+        fun into(json: JSONObject) {
+            json.put("spanMs", (lastNs - firstNs) / 1_000_000)
+            json.put("slots", JSONArray((0 until size).map { i ->
+                JSONObject().put("i", i).put("min", min[i]).put("max", max[i]).put("nonZero", nonZero[i])
+                    .put("distinct", distinct[i].size)
+            }))
+        }
     }
 
     private fun names(types: Set<DataType<*, *>>) = JSONArray(types.map { it.name }.sorted())
@@ -294,6 +344,8 @@ class HealthProbeActivity : ComponentActivity() {
         )
         val PRIVATE_IDS = listOf(65537, 65538, 65539, 65540, 65541, 65542, 65543, 65545, 65547, 65548, 65549)
         const val MAX_EVENTS_LOGGED = 40
+        const val MAX_SLOTS = 16
+        const val MAX_DISTINCT = 64
         const val MAX_POINTS_LOGGED = 20
         const val MAX_HEX = 512
     }
