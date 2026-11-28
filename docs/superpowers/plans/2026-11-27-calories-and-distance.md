@@ -1,5 +1,8 @@
 # All-day Calories and Distance Implementation Plan
 
+> **Dropped 2026-11-27, not built.** Upstream derives distance in OpenVitals with a user-entered
+> stride; Matt wants no fork to maintain. See the Decisions log in `docs/notes/pixel-watch-status.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Write all-day active calories (heart rate or cadence), total calories and distance to Health Connect from the watch's existing heart rate and steps plus OpenWatch's body profile, and show today's calories and distance as watch-face complications.

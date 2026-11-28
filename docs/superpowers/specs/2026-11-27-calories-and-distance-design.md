@@ -1,5 +1,8 @@
 # All-day calories and distance (M4)
 
+> **Dropped 2026-11-27, not built.** Upstream derives distance in OpenVitals with a user-entered
+> stride; Matt wants no fork to maintain. See the Decisions log in `docs/notes/pixel-watch-status.md`.
+
 Status: proposed 2026-11-27, revised the same day to approach B (OpenWatch's own estimate
 everywhere); awaiting Matt's approval. Built on `pixel-watch-support`; upstream-compatible in
 spirit (raw sensors + own math, no vendor library).

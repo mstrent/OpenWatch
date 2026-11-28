@@ -67,6 +67,20 @@ data as an ordinary app can actually reach.
 
 ## Decisions log
 
+- **2026-11-27 — No fork to maintain: upstream everything, then use the published app.**
+  Matt: "I don't want to maintain the fork. I want to push upstream, then use the app they
+  publish." **Supersedes "Upstream acceptance is not a goal" below.** Consequences: every change
+  must be one upstream would plausibly accept (raw sensors by default, sourced formulas in
+  `health-calculations`, no vendor library in release builds, see `AGENTS.md`); the fork branch is
+  a staging area for upstream PRs, not a product. `health-calculations` and `openlink` are
+  submodules whose only remote is upstream — changes there go through a fork of that repo + PR,
+  never a local commit the OpenWatch fork points at.
+- **2026-11-27 — M4 (all-day calories and distance) dropped.** Upstream derives distance in
+  OpenVitals ("Distance from steps", user-entered stride; height rule judged unsourced), which
+  Matt does not want; OpenWatch already writes cadence-based active calories. The design
+  (`docs/superpowers/specs/2026-11-27-calories-and-distance-design.md`) and plan are kept for the
+  record only. Heart-rate all-day calories would be an upstream proposal with sources, if ever.
+
 - **2026-11-26 — Workspace accounts only; no consumer Gmail account required.** Every
   route we build must work for a family member whose only Google account is
   Workspace. Matt's test watch *also* carries a consumer Gmail account (secondary,
@@ -195,6 +209,13 @@ see the emulator design gate in the 2026-11-26 Lobe AI journal entry). **Current
 
 ## Next actions
 
+0. **Upstream the fork's code (new top priority, 2026-11-27).** Candidates on this branch
+   (`git log upstream/main..HEAD`): Pixel raw skin temperature + skin_sensor token + phone toggle;
+   skin "now" card, variation tile/complication; settings-flow GC fix; tile caption wrap;
+   wear-install fixes (permissions, pipefail, compile sideloads), jank capture script. Fork-only,
+   not for upstream: the debug Health Services probe (vendor library, even debug-only), these
+   notes. Sort into small PRs against `Hale-MTU/OpenWatch`, each re-checked against `AGENTS.md`.
+
 1. ~~Finish M1~~ — done 2026-11-27 night (phone skin switch verified). Strava/Zepp: Strava only reads workouts from Health Connect, so nothing
    to see until a workout is recorded; Zepp not checked.
    Note: Google Health also writes the watch's steps/HR to Health Connect, so with both apps
@@ -207,8 +228,7 @@ see the emulator design gate in the 2026-11-26 Lobe AI journal entry). **Current
    evening journal); the vendor log already names the private types.
 3. The development plan below: M1 and M2 done. Matt's OK per milestone gates what follows:
    **M3** (narrowed to the doze accelerometer gap, ~60 % whole; matters for sleep) and **M4**
-   (Health Services source for calories/distance/floors — first re-check their delivery on the
-   now Workspace-only watch with the probe). Still owed on the Workspace-only watch: a
+   ~~(calories/distance)~~ — dropped 2026-11-27, see Decisions log. Still owed on the Workspace-only watch: a
    day-of-wear repeat of the HR contention check (question 4).
 4. Before any push of code: `./gradlew verifyCi verifyWearCi` and
    `python3 scripts/sync-wiki.py --repo mstrent/OpenWatch --check`. (`verifyWearCi`
