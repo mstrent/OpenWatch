@@ -362,6 +362,16 @@ Google Health. The existing Samsung paths for them stay untouched.
   also over change-minutes, not time. Proposed fix (awaiting Matt): on the watch, repeat the last
   value each worn minute (sample-and-hold), so the phone's rules and Samsung's path stay as they are.
 
+- **Bedtime mode is a schedule, not sleep (Matt; researched).** On Pixel it syncs from the
+  phone's Digital Wellbeing schedule and is meant for quiet notifications; Samsung's also runs on a
+  schedule or syncs with the phone's Sleep mode. In the code: the phone's sleep estimate ignores it
+  (found 23:42–07:24 by angle), but on the watch `sleepHolding` (bedtime hold OR `SleepHold`) gates
+  the *night* series — upstream's Samsung skin temperature and SpO2 spots, the night HRV windows
+  (those also wait for ten still minutes) — and our Pixel skin night/day split. On Pixel
+  `BedtimeMonitor` reads any Do Not Disturb between 21:00 and 09:00 as bedtime. Last night
+  22:00–23:42 of awake skin went into the night median. Candidate upstream fix (not built): the
+  phone clips the night series to the sleep it estimated in the same sync. Awaiting Matt.
+
 ### 2026-11-27 (night, 2) — Claude Code (session: review + first upstream PR)
 - **Upstream PR opened: [Hale-MTU/OpenWatch#96](https://github.com/Hale-MTU/OpenWatch/pull/96)**
   — `wear-install.sh` grants ACTIVITY_RECOGNITION/skin/SpO2, compiles non-debuggable sideloads,
